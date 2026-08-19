@@ -31,9 +31,12 @@ struct ProfileRepository {
 
     func updateDisplayName(_ name: String) async throws {
         let userId = try await Supa.client.auth.session.user.id
+        // returning: .minimal matters — the default (.representation) makes
+        // PostgREST select * on the updated row, which trips over the revoked
+        // phone_hash column and fails the whole update with 42501.
         try await Supa.client
             .from("profiles")
-            .update(["display_name": name])
+            .update(["display_name": name], returning: .minimal)
             .eq("id", value: userId)
             .execute()
     }
