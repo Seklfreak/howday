@@ -8,6 +8,9 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.5.0
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 9.26.0
 configFiles:
   Debug: Config/Secrets.xcconfig
   Release: Config/Secrets.xcconfig
@@ -21,6 +24,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         # Not dev.winkler.moodring: that id got burned by an early build on
@@ -52,6 +57,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        SENTRY_DSN: $(SENTRY_DSN)
         NSContactsUsageDescription: >-
           Moodring reads your contacts only to find friends who already use
           the app. Phone numbers are hashed on your device before matching and

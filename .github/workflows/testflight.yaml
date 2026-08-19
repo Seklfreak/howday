@@ -17,6 +17,8 @@ name: TestFlight
 #   APPLE_DIST_CERT_PASSWORD                          - the .p12 export password
 #   APP_STORE_PROFILE                                 - base64 of the App Store .mobileprovision
 #   SUPABASE_URL / SUPABASE_ANON_KEY                  - baked into the shipped app
+#   SENTRY_DSN                                        - baked into the shipped app (crash reporting)
+#   SENTRY_AUTH_TOKEN                                 - optional: dSYM upload for symbolicated crashes
 on:
   push:
     tags: ["v*.*.*"]
@@ -111,6 +113,7 @@ jobs:
           TEAM_ID: ${{ secrets.APP_STORE_TEAM_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           # Marketing version: dispatch input wins, else derive from the tag (vX.Y.Z -> X.Y.Z).
@@ -132,7 +135,25 @@ jobs:
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD" \
             SUPABASE_URL="$SUPABASE_URL" \
-            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            SENTRY_DSN="$SENTRY_DSN"
+
+      # Symbolicated crash reports need the dSYMs in Sentry. Best-effort and
+      # dormant without SENTRY_AUTH_TOKEN — the archive itself doesn't depend
+      # on it.
+      - name: Upload dSYMs to Sentry
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::notice::SENTRY_AUTH_TOKEN not set — skipping dSYM upload."
+            exit 0
+          fi
+          brew install getsentry/tools/sentry-cli
+          sentry-cli debug-files upload \
+            --org winktech --project moodring-ios \
+            build/MoodRing.xcarchive/dSYMs || echo "::warning::Sentry dSYM upload failed"
 
       - name: Export + upload to TestFlight
         if: steps.gate.outputs.ready == 'true'

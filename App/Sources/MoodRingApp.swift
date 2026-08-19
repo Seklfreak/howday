@@ -1,8 +1,21 @@
+import Sentry
 import Supabase
 import SwiftUI
 
 @main
 struct MoodRingApp: App {
+    init() {
+        // Debug builds stay quiet — local runs would drown real crash
+        // reports, and the placeholder xcconfig has no DSN anyway.
+        #if !DEBUG
+        if let dsn = AppConfig.sentryDSN {
+            SentrySDK.start { options in
+                options.dsn = dsn
+            }
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
