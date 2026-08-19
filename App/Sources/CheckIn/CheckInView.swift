@@ -1,8 +1,10 @@
+import Supabase
 import SwiftUI
 
 struct CheckInView: View {
     @State private var existing: Checkin?
     @State private var emoji = ""
+    @State private var wildcard: String?
     @State private var note = ""
     @State private var isLoading = true
     @State private var isSaving = false
@@ -38,10 +40,10 @@ struct CheckInView: View {
     private var form: some View {
         Form {
             Section {
-                HStack(spacing: 8) {
-                    ForEach(MoodEmoji.suggestions, id: \.self) { suggestion in
-                        EmojiButton(emoji: suggestion, isSelected: emoji == suggestion) {
-                            emoji = suggestion
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 12) {
+                    ForEach(choices, id: \.self) { choice in
+                        EmojiButton(emoji: choice, isSelected: emoji == choice) {
+                            emoji = choice
                             justSaved = false
                         }
                     }
@@ -98,8 +100,16 @@ struct CheckInView: View {
         }
     }
 
+    /// The six offered emoji: the fixed suggestions plus the user's daily
+    /// wildcard, laid out by the grid as two rows of three.
+    private var choices: [String] {
+        MoodEmoji.suggestions + (wildcard.map { [$0] } ?? [])
+    }
+
     private func load() async {
         do {
+            let userId = try await Supa.client.auth.session.user.id
+            wildcard = MoodEmoji.wildcard(for: userId, day: LocalDay.string())
             existing = try await CheckinRepository().today()
             if let existing {
                 emoji = existing.emoji
