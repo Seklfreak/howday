@@ -1,0 +1,41 @@
+name: MoodRing
+options:
+  bundleIdPrefix: dev.winkler
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.5.0
+configFiles:
+  Debug: Config/Secrets.xcconfig
+  Release: Config/Secrets.xcconfig
+targets:
+  MoodRing:
+    type: application
+    platform: iOS
+    sources:
+      - App/Sources
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.winkler.moodring
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        TARGETED_DEVICE_FAMILY: 1
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Mood Ring
+        UILaunchScreen: {}
+        SUPABASE_URL: $(SUPABASE_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        NSContactsUsageDescription: >-
+          Mood Ring reads your contacts only to find friends who already use
+          the app. Phone numbers are hashed on your device before matching and
+          are never stored on the server.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
