@@ -75,4 +75,6 @@ auto-cuts a versioned release (`release.yaml`, Seklfreak/ai-release-action
 proposes the semver bump), and the version tag triggers `testflight.yaml`,
 which archives with a stored distribution certificate and uploads to
 TestFlight — dormant until the App Store Connect secrets listed in that file
-exist.
+exist. `testflight-refresh.yaml` runs monthly and re-uploads the latest
+released tag when the newest TestFlight build is older than ~30 days, so the
+build never hits TestFlight's 90-day expiry during quiet stretches.
