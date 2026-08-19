@@ -3,7 +3,6 @@ import SwiftUI
 struct CheckInView: View {
     @State private var existing: Checkin?
     @State private var emoji = ""
-    @State private var customEmoji = ""
     @State private var note = ""
     @State private var isLoading = true
     @State private var isSaving = false
@@ -43,26 +42,12 @@ struct CheckInView: View {
                     ForEach(MoodEmoji.suggestions, id: \.self) { suggestion in
                         EmojiButton(emoji: suggestion, isSelected: emoji == suggestion) {
                             emoji = suggestion
-                            customEmoji = ""
                             justSaved = false
                         }
                     }
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
-                TextField("Or any other emoji", text: $customEmoji)
-                    .onChange(of: customEmoji) { _, new in
-                        justSaved = false
-                        if let picked = new.firstEmoji {
-                            emoji = picked
-                            if new != picked { customEmoji = picked }
-                        } else {
-                            // Non-emoji input is dropped; losing the custom
-                            // emoji clears the selection too.
-                            if !new.isEmpty { customEmoji = "" }
-                            if !MoodEmoji.suggestions.contains(emoji) { emoji = "" }
-                        }
-                    }
             } header: {
                 Text(existing == nil ? "How are you today?" : "Today's check-in")
             }
@@ -118,9 +103,6 @@ struct CheckInView: View {
             existing = try await CheckinRepository().today()
             if let existing {
                 emoji = existing.emoji
-                if !MoodEmoji.suggestions.contains(existing.emoji) {
-                    customEmoji = existing.emoji
-                }
                 note = existing.note ?? ""
             }
         } catch {
