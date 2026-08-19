@@ -30,7 +30,7 @@ struct CheckInView: View {
                 }
             }
             .sheet(isPresented: $showReminderSettings) {
-                ReminderSettingsView()
+                SettingsView()
             }
             .task { await load() }
         }
