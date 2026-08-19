@@ -161,12 +161,6 @@ private struct CheckinDetailSheet: View {
         VStack(spacing: 12) {
             Text(checkin.emoji).font(.system(size: 44))
             Text(checkin.day).font(.subheadline).foregroundStyle(.secondary)
-            if let note = checkin.note {
-                Text(note)
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
         }
         .padding()
     }

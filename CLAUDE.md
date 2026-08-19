@@ -44,6 +44,11 @@ and window-geometry guessing; AXe needs neither.
   (`No keycode found for character`). Instead: `printf '🥳' | xcrun simctl
   pbcopy <UDID>`, long-press the field (`axe touch -x -y --down`, sleep ~1s,
   `--up`), then `describe-ui` to find and tap the `Paste` callout button.
+- **The iOS 26 simulator runtime does not render color emoji** — every emoji
+  shows as a missing-glyph "?" box, at any size, in the app AND in the sim's
+  Safari (that's how to prove it's not an app bug). Judge emoji rendering on a
+  real device; in the sim, verify emoji correctness via the accessibility
+  tree's AXLabels instead of screenshots.
 - Sign-in uses the Supabase test phone numbers with the fixed OTP (deliberately
   not in this repo — see README/rls-proof env). They're readable via the
   Management API: `curl -H "Authorization: Bearer $(cat ~/.supabase/access-token)"

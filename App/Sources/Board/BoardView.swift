@@ -114,13 +114,6 @@ private struct BoardCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let note = entry.checkin?.note {
-                Text(note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
