@@ -1,6 +1,6 @@
 name: MoodRing
 options:
-  bundleIdPrefix: dev.winkler
+  bundleIdPrefix: dev.winktech
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -23,9 +23,9 @@ targets:
         product: Supabase
     settings:
       base:
-        # moodringapp, not moodring: the bare id got burned by an early build
-        # on the personal team, and App IDs are unique across all teams.
-        PRODUCT_BUNDLE_IDENTIFIER: dev.winkler.moodringapp
+        # Not dev.winkler.moodring: that id got burned by an early build on
+        # the personal team, and App IDs are unique across all teams.
+        PRODUCT_BUNDLE_IDENTIFIER: dev.winktech.moodring
         # Paid Developer Program team — required for TestFlight distribution.
         DEVELOPMENT_TEAM: LNHGT6463S
         CODE_SIGN_STYLE: Automatic
