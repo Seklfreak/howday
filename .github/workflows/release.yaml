@@ -1,0 +1,42 @@
+name: Release
+
+# Auto-cut a release on every green commit to main (Test must pass first).
+# The bump decision, release notes, tagging and build dispatch all live in
+# Seklfreak/ai-release-action — this file supplies only what is specific to
+# moodring.
+#
+# project-description is what the classifier judges "can this change reach a
+# user?" against, so it must describe THIS project.
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write # push tag + create release
+  actions: write # dispatch the build workflow
+
+jobs:
+  release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0 # the bump is read from the commit range
+          fetch-tags: true # the previous tag is the baseline
+
+      - uses: Seklfreak/ai-release-action@v1
+        with:
+          sha: ${{ github.event.workflow_run.head_sha }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          build-workflow: "testflight.yaml"
+          project-description: >-
+            Moodring is an iOS app (SwiftUI, whole repo) shipped to TestFlight
+            on every version tag: a daily mood check-in shared with friends.
+            Changes under App/ and supabase/ reach users — supabase/ holds the
+            backend schema and Edge Functions the shipped app talks to. Only
+            scripts/, README and CI workflows live outside the released
+            artifact.

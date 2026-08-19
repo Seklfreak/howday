@@ -61,3 +61,12 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   policy boundary against a live project — it needs `MOODRING_URL`,
   `MOODRING_KEY`, `TEST_PHONE_A/B`, and `TEST_OTP` in the environment
   (configure test numbers under Authentication → Phone → Test OTPs).
+
+## CI
+
+`.github/workflows/test.yaml` compile-checks every push/PR. A green `main`
+auto-cuts a versioned release (`release.yaml`, Seklfreak/ai-release-action
+proposes the semver bump), and the version tag triggers `testflight.yaml`,
+which archives with a stored distribution certificate and uploads to
+TestFlight — dormant until the App Store Connect secrets listed in that file
+exist.
