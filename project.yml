@@ -29,12 +29,12 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Mood Ring
+        CFBundleDisplayName: Moodring
         UILaunchScreen: {}
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
         NSContactsUsageDescription: >-
-          Mood Ring reads your contacts only to find friends who already use
+          Moodring reads your contacts only to find friends who already use
           the app. Phone numbers are hashed on your device before matching and
           are never stored on the server.
         UISupportedInterfaceOrientations:

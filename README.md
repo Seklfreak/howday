@@ -1,4 +1,4 @@
-# Mood Ring
+# Moodring
 
 One mood check-in a day; see how your friends are doing. iOS (SwiftUI, iOS 17+)
 with a Supabase backend and phone-number sign-in via Twilio Verify.

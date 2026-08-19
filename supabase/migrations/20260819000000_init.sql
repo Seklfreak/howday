@@ -1,4 +1,4 @@
--- Mood Ring initial schema: profiles, friendships, checkins, RLS.
+-- Moodring initial schema: profiles, friendships, checkins, RLS.
 create extension if not exists pgcrypto;
 
 -- ---------------------------------------------------------------------------

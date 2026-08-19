@@ -58,7 +58,7 @@ struct PhoneSignInView: View {
                     }
                 }
             }
-            .navigationTitle("Mood Ring")
+            .navigationTitle("Moodring")
         }
     }
 
