@@ -4,6 +4,8 @@ import SwiftUI
 
 @main
 struct MoodRingApp: App {
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
+
     init() {
         // Debug builds stay quiet — local runs would drown real crash
         // reports, and the placeholder xcconfig has no DSN anyway.
@@ -44,6 +46,13 @@ struct RootView: View {
                 OnboardingView { stage = .ready }
             case .ready:
                 MainTabView()
+            }
+        }
+        .onChange(of: stage) {
+            // Every launch that reaches the signed-in UI re-registers, so a
+            // rotated APNs token is re-uploaded without any bookkeeping.
+            if stage == .ready {
+                Task { await PushRegistrar.register() }
             }
         }
         .task {

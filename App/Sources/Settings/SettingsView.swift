@@ -21,7 +21,12 @@ struct SettingsView: View {
 
                 Section {
                     Button("Sign out") {
-                        Task { try? await Supa.client.auth.signOut() }
+                        Task {
+                            // Drop the push token first — signed-out devices
+                            // must stop receiving friend check-ins.
+                            await PushRegistrar.unregister()
+                            try? await Supa.client.auth.signOut()
+                        }
                     }
                     Button("Delete account", role: .destructive) {
                         confirmDelete = true
@@ -88,6 +93,9 @@ struct SettingsView: View {
         isDeleting = true
         Task {
             do {
+                // Clears the locally remembered push token; the server rows
+                // cascade away with the account.
+                await PushRegistrar.unregister()
                 struct Result: Decodable { let deleted: Bool }
                 let _: Result = try await Supa.client.functions.invoke("delete-account")
                 // Server-side account is gone; drop the local session. The

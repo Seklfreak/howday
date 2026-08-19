@@ -36,6 +36,28 @@ redistribution.
    Authentication → Phone → Test OTPs.
 4. **App secrets** — `cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig`
    and fill in the project URL + anon key (Dashboard → Project Settings → API).
+5. **Push notifications** (friend check-ins) — optional; without this setup
+   check-ins still work, the notify trigger just no-ops.
+   1. Apple Developer portal: enable the **Push Notifications** capability on
+      the App ID, then regenerate the App Store provisioning profile (and
+      update the `APP_STORE_PROFILE` CI secret — archives fail signing against
+      the old profile once the entitlement is in the app). Create an **APNs
+      auth key** (Certificates → Keys → Apple Push Notifications service),
+      download the `.p8`, note the Key ID.
+   2. Edge Function secrets:
+      ```sh
+      supabase secrets set \
+        APNS_AUTH_KEY="$(cat AuthKey_XXXXXXXXXX.p8)" \
+        APNS_KEY_ID=<key id> APNS_TEAM_ID=<team id> \
+        PUSH_FN_SECRET=$(openssl rand -hex 32)
+      supabase functions deploy push-checkin
+      ```
+   3. Tell the DB trigger where to call (SQL editor; Vault keeps the project
+      ref and secret out of this public repo):
+      ```sql
+      select vault.create_secret('https://<PROJECT_REF>.supabase.co', 'project_url');
+      select vault.create_secret('<the same PUSH_FN_SECRET value>', 'push_fn_secret');
+      ```
 
 ## Build & run
 
@@ -57,6 +79,9 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   matching must hash the identical form (`PhoneNumber.hashForMatching`).
 - **`checkins.day`** is the user's *local* date, computed client-side; the
   `unique (user_id, day)` constraint enforces one check-in per day.
+- **Friend-check-in pushes** notify only *mutual* contacts, only on the first
+  check-in of the day (the trigger is INSERT-only; emoji edits are updates),
+  and the alert text is generic — the server stores no names to put in it.
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
 - Privacy lives in RLS, not in the app: your check-ins are readable only by

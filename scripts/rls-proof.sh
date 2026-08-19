@@ -82,6 +82,18 @@ check "clients cannot read contact_links" "$(rest "$AT" "$URL/rest/v1/contact_li
 check "clients cannot forge contact_links" "$(rest "$AT" -X POST "$URL/rest/v1/contact_links" -d "{\"owner_id\":\"$BID\",\"user_id\":\"$AID\"}")" "permission denied"
 check "profiles are sealed from clients" "$(rest "$AT" "$URL/rest/v1/profiles?select=id")" "permission denied"
 
+# 4b. Push plumbing: the token table is sealed, registration goes through the
+# RPCs and is scoped to the caller, and the fan-out RPC is service-role only.
+check "clients cannot read device_tokens" "$(rest "$AT" "$URL/rest/v1/device_tokens?select=token")" "permission denied"
+check "clients cannot write device_tokens directly" \
+  "$(rest "$AT" -X POST "$URL/rest/v1/device_tokens" -d "{\"token\":\"deadbeefdeadbeef\",\"user_id\":\"$AID\"}")" "permission denied"
+FAKE_TOKEN=$(printf 'ab%.0s' {1..32})
+R=$(rest "$AT" -X POST "$URL/rest/v1/rpc/register_device_token" -d "{\"device_token\":\"$FAKE_TOKEN\",\"is_sandbox\":true}")
+check "A registers a device token via rpc" "${R:-ok}" "ok"
+check "push recipient fan-out is service-role only" \
+  "$(rest "$AT" -X POST "$URL/rest/v1/rpc/checkin_push_recipients" -d "{\"author\":\"$AID\"}")" "permission denied"
+rest "$AT" -X POST "$URL/rest/v1/rpc/unregister_device_token" -d "{\"device_token\":\"$FAKE_TOKEN\"}" > /dev/null
+
 # 5. sync-contacts input validation
 check "sync rejects malformed hashes" "$(sync "$AT" '["nope"]')" "sha256 hex"
 

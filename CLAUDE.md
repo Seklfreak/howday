@@ -97,6 +97,18 @@ and window-geometry guessing; AXe needs neither.
 - Tables must be in the `supabase_realtime` publication to emit
   postgres_changes (`checkins` is; new tables need a migration).
 
+## Push notifications
+
+- The check-in push trigger reads `project_url` and `push_fn_secret` from
+  **Vault** (repo is public — no project ref in migrations) and silently
+  no-ops if they're absent; the `push-checkin` Edge Function has
+  `verify_jwt = false` and is gated only by the `x-push-secret` header.
+- APNs tokens are **environment-specific**: the `aps-environment` entitlement
+  comes from the `APS_ENVIRONMENT` build setting (Debug = development,
+  Release = production), and `PushRegistrar`'s `#if DEBUG` sandbox flag must
+  match — a token sent to the wrong APNs host is just `BadDeviceToken`
+  (and gets deleted by the function's dead-token cleanup).
+
 ## Auth / Twilio
 
 - Twilio Verify on a **trial** account only delivers to verified caller IDs —
