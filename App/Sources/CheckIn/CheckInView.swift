@@ -76,6 +76,9 @@ struct CheckInView: View {
             confirmed = try await CheckinRepository().today()?.emoji
             selected = confirmed
         } catch {
+            // Leaving the tab cancels the .task mid-request; don't show
+            // that as an error — reappearing restarts the load anyway.
+            guard !error.isCancellation else { return }
             errorMessage = error.localizedDescription
         }
         isLoading = false

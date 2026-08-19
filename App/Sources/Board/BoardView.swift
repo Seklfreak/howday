@@ -90,6 +90,9 @@ struct BoardView: View {
                 board = try await BoardRepository().load()
                 errorMessage = nil
             } catch {
+                // Leaving the tab cancels the .task mid-request; don't show
+                // that as an error — reappearing restarts the load anyway.
+                guard !error.isCancellation else { return }
                 errorMessage = error.localizedDescription
             }
         }
