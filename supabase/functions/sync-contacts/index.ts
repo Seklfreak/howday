@@ -24,15 +24,24 @@ Deno.serve(async (req) => {
     hashes.length > MAX_HASHES ||
     !hashes.every((h) => typeof h === "string" && /^[0-9a-f]{64}$/.test(h))
   ) {
-    return json({ error: `hashes must be 0-${MAX_HASHES} sha256 hex strings` }, 400);
+    return json(
+      { error: `hashes must be 0-${MAX_HASHES} sha256 hex strings` },
+      400,
+    );
   }
 
   // Identify the caller from their JWT (verify_jwt is on, but we also need
   // the user id to write their links).
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-  });
+  const userClient = createClient(
+    supabaseUrl,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    {
+      global: {
+        headers: { Authorization: req.headers.get("Authorization") ?? "" },
+      },
+    },
+  );
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) {
     return json({ error: "unauthorized" }, 401);
@@ -41,7 +50,10 @@ Deno.serve(async (req) => {
   // Service role: phone_hash and contact_links are revoked from client
   // roles. rpc() sends the hash array in the request body — .in() would put
   // it in the URL, which breaks past ~1000 hashes.
-  const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const admin = createClient(
+    supabaseUrl,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
   const { data: rows, error } = hashes.length > 0
     ? await admin.rpc("match_phone_hashes", { hashes })
     : { data: [], error: null };
@@ -54,7 +66,10 @@ Deno.serve(async (req) => {
 
   // Replace, don't merge: deleting someone from your contacts must delete
   // the link too — that is how mutuality (and their view of you) ends.
-  const del = await admin.from("contact_links").delete().eq("owner_id", user.id);
+  const del = await admin.from("contact_links").delete().eq(
+    "owner_id",
+    user.id,
+  );
   if (del.error) {
     return json({ error: del.error.message }, 500);
   }

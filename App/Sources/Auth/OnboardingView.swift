@@ -16,7 +16,12 @@ struct OnboardingView: View {
                 .foregroundStyle(.tint)
             Text("Find your friends")
                 .font(.title.weight(.semibold))
-            Text("Moodring is contacts-based: you see each other's moods once you're both in each other's contacts, shown with the name and photo from your address book. Phone numbers are hashed on your device before matching — names and photos never leave your phone.")
+            Text(
+                "Moodring is contacts-based: you see each other's moods once you're both "
+                    + "in each other's contacts, shown with the name and photo from your "
+                    + "address book. Phone numbers are hashed on your device before matching "
+                    + "— names and photos never leave your phone."
+            )
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Spacer()

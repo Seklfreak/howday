@@ -8,15 +8,24 @@ Deno.serve(async (req) => {
     return json({ error: "POST only" }, 405);
   }
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-  });
+  const userClient = createClient(
+    supabaseUrl,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    {
+      global: {
+        headers: { Authorization: req.headers.get("Authorization") ?? "" },
+      },
+    },
+  );
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) {
     return json({ error: "unauthorized" }, 401);
   }
 
-  const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const admin = createClient(
+    supabaseUrl,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     return json({ error: error.message }, 500);

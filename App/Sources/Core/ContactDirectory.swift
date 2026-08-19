@@ -6,6 +6,18 @@ import Supabase
 /// graph: phone-number hashes are synced to the server to derive mutual
 /// links, while names and photos stay on-device and are looked up here
 /// for display.
+/// A my_mutuals() row: a mutual contact's user id plus their phone hash,
+/// which keys the lookup into the local address book.
+private struct MutualRow: Decodable {
+    let id: UUID
+    let phoneHash: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case phoneHash = "phone_hash"
+    }
+}
+
 enum ContactDirectory {
     struct Identity: Sendable, Hashable {
         let name: String
@@ -43,15 +55,7 @@ enum ContactDirectory {
             options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
         )
 
-        struct Mutual: Decodable {
-            let id: UUID
-            let phoneHash: String
-            enum CodingKeys: String, CodingKey {
-                case id
-                case phoneHash = "phone_hash"
-            }
-        }
-        let mutuals: [Mutual] = try await Supa.client
+        let mutuals: [MutualRow] = try await Supa.client
             .rpc("my_mutuals")
             .execute()
             .value

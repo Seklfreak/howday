@@ -1,0 +1,20 @@
+# Focused Swift lint: keep the valuable default rules, relax the stylistic noise
+# that fights idiomatic short closure/loop variables. Run with `swiftlint` (also
+# enforced in CI).
+included:
+  - App/Sources
+
+line_length:
+  warning: 140
+  ignores_comments: true
+  ignores_urls: true
+
+# Single-letter names are fine in tight closures (r, p, v, …).
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1
+
+disabled_rules:
+  - trailing_comma # trailing commas keep diffs clean
+  - optional_data_string_conversion

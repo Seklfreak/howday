@@ -41,7 +41,9 @@ struct PhoneSignInView: View {
                         Text("Code sent to \(phone)")
                     }
                     Section {
-                        Button(action: { verify(phone: phone) }) {
+                        Button {
+                            verify(phone: phone)
+                        } label: {
                             if isBusy { ProgressView() } else { Text("Verify") }
                         }
                         .disabled(isBusy || code.count < 4)

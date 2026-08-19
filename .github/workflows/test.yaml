@@ -8,6 +8,33 @@ on:
   pull_request:
 
 jobs:
+  # Lints the backend: Deno format/lint/type-check for the Edge Functions,
+  # then the migrations are applied to a scratch database (which proves they
+  # run cleanly from zero) and `db lint` runs plpgsql_check over the result.
+  supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Edge Functions (fmt, lint, type-check)
+        run: |
+          deno fmt --check supabase/functions
+          deno lint supabase/functions
+          deno check supabase/functions/*/index.ts
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Migrations apply from zero + database lint
+        run: |
+          supabase db start
+          supabase db lint --fail-on warning
+
   build:
     # macos-26 for the iOS 26 SDK, matching what testflight.yaml ships with.
     runs-on: macos-26
@@ -16,7 +43,7 @@ jobs:
 
       - name: Tooling
         run: |
-          brew install xcodegen
+          brew install xcodegen swiftlint
           xcodebuild -version
 
       - name: Generate project
@@ -25,6 +52,9 @@ jobs:
           # as build settings only in the TestFlight archive.
           cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
           xcodegen generate
+
+      - name: SwiftLint
+        run: swiftlint lint --strict
 
       - name: Build (iOS Simulator, unsigned)
         run: |

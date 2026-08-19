@@ -27,6 +27,20 @@ struct Checkin: Codable, Identifiable, Sendable {
     }
 }
 
+/// The upsert body for saveToday.
+private struct CheckinPayload: Encodable {
+    let userId: UUID
+    let day: String
+    let emoji: String
+    let updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case day, emoji
+        case userId = "user_id"
+        case updatedAt = "updated_at"
+    }
+}
+
 struct CheckinRepository {
     static let columns = "id, user_id, day, emoji"
 
@@ -47,18 +61,12 @@ struct CheckinRepository {
     /// day, which is what enforces "editable until midnight": yesterday's row
     /// simply can't be addressed from the UI.
     func saveToday(emoji: String) async throws {
-        struct Payload: Encodable {
-            let user_id: UUID
-            let day: String
-            let emoji: String
-            let updated_at: String
-        }
         let userId = try await Supa.client.auth.session.user.id
-        let payload = Payload(
-            user_id: userId,
+        let payload = CheckinPayload(
+            userId: userId,
             day: LocalDay.string(),
             emoji: emoji,
-            updated_at: ISO8601DateFormatter().string(from: .now)
+            updatedAt: ISO8601DateFormatter().string(from: .now)
         )
         try await Supa.client
             .from("checkins")
