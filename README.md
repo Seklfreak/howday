@@ -1,8 +1,11 @@
 # Moodring
 
 One mood check-in a day; see how your friends are doing. You can't see your
-friends' moods until you've shared yours. iOS (SwiftUI, iOS 17+) with a
-Supabase backend and phone-number sign-in via Twilio Verify.
+friends' moods until you've shared yours. Friends are contacts-based — no
+friend requests, no profiles to fill in: you see each other once you're both
+in each other's address books, shown with the name and photo from your own
+contacts. iOS (SwiftUI, iOS 17+) with a Supabase backend and phone-number
+sign-in via Twilio Verify.
 
 Source-visible, all rights reserved — no license is granted for reuse or
 redistribution.
@@ -10,10 +13,10 @@ redistribution.
 ## Repo layout
 
 - `project.yml` — XcodeGen definition; the `.xcodeproj` is generated, not committed
-- `App/Sources/` — SwiftUI app, one folder per feature (Auth, CheckIn, Board, Friends, History, Core)
+- `App/Sources/` — SwiftUI app, one folder per feature (Auth, CheckIn, Board, History, Core)
 - `Config/Secrets.xcconfig` — Supabase URL + anon key (gitignored; copy from `Secrets.example.xcconfig`)
 - `supabase/migrations/` — schema + RLS, applied with the Supabase CLI
-- `supabase/functions/match-contacts/` — Edge Function for hashed contact matching (deployed in M2)
+- `supabase/functions/sync-contacts/` — Edge Function that turns hashed contact uploads into `contact_links`
 
 ## One-time setup
 
@@ -56,11 +59,14 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   `unique (user_id, day)` constraint enforces one check-in per day.
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
-- Privacy lives in RLS, not in the app: friends with `accepted` status can
-  read your check-ins, nobody else. `scripts/rls-proof.sh` asserts every
-  policy boundary against a live project — it needs `MOODRING_URL`,
-  `MOODRING_KEY`, `TEST_PHONE_A/B`, and `TEST_OTP` in the environment
-  (configure test numbers under Authentication → Phone → Test OTPs).
+- Privacy lives in RLS, not in the app: your check-ins are readable only by
+  *mutual* contacts — the hashed-contact sync must have linked you both ways.
+  A one-way link (someone merely has your number) grants nothing. Names and
+  photos are never uploaded; each viewer renders friends from their own
+  address book. `scripts/rls-proof.sh` asserts every policy boundary against
+  a live project — it needs `MOODRING_URL`, `MOODRING_KEY`,
+  `TEST_PHONE_A/B`, and `TEST_OTP` in the environment (configure test
+  numbers under Authentication → Phone → Test OTPs).
 
 ## CI
 

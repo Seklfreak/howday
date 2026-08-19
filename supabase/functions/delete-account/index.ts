@@ -1,6 +1,6 @@
 // Deletes the calling user's account. Removing the auth.users row cascades
-// through profiles into friendships and checkins (FK on delete cascade), so
-// this one call erases everything the user owns.
+// through profiles into contact_links and checkins (FK on delete cascade),
+// so this one call erases everything the user owns.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 Deno.serve(async (req) => {

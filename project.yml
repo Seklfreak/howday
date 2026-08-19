@@ -59,8 +59,8 @@ targets:
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
         SENTRY_DSN: $(SENTRY_DSN)
         NSContactsUsageDescription: >-
-          Moodring reads your contacts only to find friends who already use
-          the app. Phone numbers are hashed on your device before matching and
-          are never stored on the server.
+          Moodring is contacts-based: friends are matched by hashed phone
+          numbers, and their names and photos are shown straight from your
+          address book. Names and photos never leave your device.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

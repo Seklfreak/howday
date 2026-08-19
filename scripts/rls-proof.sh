@@ -1,6 +1,8 @@
 #!/bin/zsh
-# Two-account RLS proof for Moodring: exercises the full friendship
-# lifecycle against a live project and asserts every policy boundary.
+# Two-account RLS proof for Moodring's contacts-based model: exercises the
+# sync → mutual → unsync lifecycle against a live project and asserts every
+# policy boundary. The critical property: a ONE-WAY contact link must grant
+# nothing — visibility requires the link in both directions.
 #
 # Required environment:
 #   MOODRING_URL     — project URL, e.g. https://<ref>.supabase.co
@@ -25,6 +27,7 @@ except Exception: print(''); sys.exit()
 for k in sys.argv[1].split('.'):
   d = d[int(k)] if isinstance(d, list) else d.get(k, {})
 print(d if isinstance(d,str) else json.dumps(d))" "$1"; }
+hash256() { python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest())" "$1"; }
 
 signin() { # $1 phone-without-plus -> prints access_token|user_id
   curl -s -X POST "$URL/auth/v1/otp" -H "apikey: $KEY" -H 'Content-Type: application/json' -d "{\"phone\":\"+$1\"}" > /dev/null
@@ -37,60 +40,55 @@ B=$(signin "$TEST_PHONE_B"); BT=${B%|*}; BID=${B#*|}
 [[ -n "$AT" && -n "$BT" ]] || { echo "sign-in failed"; exit 1 }
 echo "A=$AID  B=$BID"
 
+AHASH=$(hash256 "$TEST_PHONE_A")
+BHASH=$(hash256 "$TEST_PHONE_B")
+
 rest() { # $1 token, then curl args
   local T=$1; shift
   curl -s -H "apikey: $KEY" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' "$@"
 }
+sync() { # $1 token, $2 hashes-json-array
+  rest "$1" -X POST "$URL/functions/v1/sync-contacts" -d "{\"hashes\":$2}"
+}
 
-# Clean slate: drop any A-B relationship left over from earlier runs.
-rest "$AT" -X DELETE "$URL/rest/v1/friendships?or=(requester.eq.$AID,addressee.eq.$AID)" > /dev/null
+# Clean slate: both drop all links left over from earlier runs.
+sync "$AT" '[]' > /dev/null
+sync "$BT" '[]' > /dev/null
 
-# B sets a display name (returning minimal)
-rest "$BT" -X PATCH "$URL/rest/v1/profiles?id=eq.$BID" -d '{"display_name":"Bob Test"}' > /dev/null
 # B checks in
 rest "$BT" -X POST "$URL/rest/v1/checkins?on_conflict=user_id,day" -H 'Prefer: resolution=merge-duplicates' \
-  -d "{\"user_id\":\"$BID\",\"day\":\"$(date +%F)\",\"emoji\":\"🙂\",\"note\":\"secret note\"}" > /dev/null
-BCHK=$(rest "$BT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id,emoji,note" | jsonget 0.id)
+  -d "{\"user_id\":\"$BID\",\"day\":\"$(date +%F)\",\"emoji\":\"🙂\"}" > /dev/null
+BCHK=$(rest "$BT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id" | jsonget 0.id)
 
-# 1. Strangers can't see each other
-check "stranger cannot read B's profile" "$(rest "$AT" "$URL/rest/v1/profiles?id=eq.$BID&select=id")" "[]"
+# 1. Strangers see nothing
 check "stranger cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
 
-# 2. Contact matching finds B for A (Edge Function, service role)
-BHASH=$(python3 -c "import hashlib,os;print(hashlib.sha256(os.environ['TEST_PHONE_B'].encode()).hexdigest())")
-MATCH=$(rest "$AT" -X POST "$URL/functions/v1/match-contacts" -d "{\"hashes\":[\"$BHASH\"]}")
-check "match-contacts returns B" "$MATCH" "$BID"
-check "match-contacts returns B's name" "$MATCH" "Bob Test"
+# 2. A one-way link grants NOTHING — the model's core property
+check "A syncs B's number" "$(sync "$AT" "[\"$BHASH\"]")" '"linked":1'
+check "one-way: A still cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
+check "one-way: A's mutuals are empty" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "[]"
+check "one-way: B's mutuals are empty too" "$(rest "$BT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "[]"
 
-# 3. A cannot forge a request FROM B
-check "cannot insert friendship as someone else" \
-  "$(rest "$AT" -X POST "$URL/rest/v1/friendships" -d "{\"requester\":\"$BID\",\"addressee\":\"$AID\",\"status\":\"pending\"}")" "violates row-level security"
+# 3. The link in both directions unlocks both sides
+sync "$BT" "[\"$AHASH\"]" > /dev/null
+check "mutual: A reads B's checkin" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=emoji")" "🙂"
+check "mutual: my_mutuals returns B for A" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "$BID"
+check "mutual: my_mutuals echoes B's phone_hash" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "$BHASH"
 
-# 4. A requests B properly
-FID=$(rest "$AT" -X POST "$URL/rest/v1/friendships" -H 'Prefer: return=representation' \
-  -d "{\"requester\":\"$AID\",\"addressee\":\"$BID\",\"status\":\"pending\"}" | jsonget 0.id)
-check "request created" "$FID" "-"
-
-# 5. Requester cannot self-accept
-SELF=$(rest "$AT" -X PATCH "$URL/rest/v1/friendships?id=eq.$FID" -H 'Prefer: return=representation' -d '{"status":"accepted"}')
-check "requester cannot accept own request" "$SELF" "[]"
-
-# 6. Pending: A can now see B's profile (to show the name) but still no checkins
-check "pending: A sees B's name" "$(rest "$AT" "$URL/rest/v1/profiles?id=eq.$BID&select=display_name")" "Bob Test"
-check "pending: still no checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
-
-# 7. Addressee accepts
-rest "$BT" -X PATCH "$URL/rest/v1/friendships?id=eq.$FID" -d '{"status":"accepted"}' > /dev/null
-check "accepted: A reads B's checkin" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=note")" "secret note"
-
-# 8. Friends still can't write each other's data
+# 4. Mutuality still doesn't grant writes, and the raw tables stay sealed
 check "A cannot edit B's checkin" "$(rest "$AT" -X PATCH "$URL/rest/v1/checkins?id=eq.$BCHK" -H 'Prefer: return=representation' -d '{"emoji":"😢"}')" "[]"
 check "checkin delete is revoked" "$(rest "$AT" -X DELETE "$URL/rest/v1/checkins?id=eq.$BCHK")" "permission denied"
-check "phone_hash stays hidden even from friends" "$(rest "$AT" "$URL/rest/v1/profiles?id=eq.$BID&select=phone_hash")" "permission denied"
+check "clients cannot read contact_links" "$(rest "$AT" "$URL/rest/v1/contact_links?select=owner_id")" "permission denied"
+check "clients cannot forge contact_links" "$(rest "$AT" -X POST "$URL/rest/v1/contact_links" -d "{\"owner_id\":\"$BID\",\"user_id\":\"$AID\"}")" "permission denied"
+check "profiles are sealed from clients" "$(rest "$AT" "$URL/rest/v1/profiles?select=id")" "permission denied"
 
-# 9. Unfriend closes the door again
-rest "$AT" -X DELETE "$URL/rest/v1/friendships?id=eq.$FID" > /dev/null
-check "after unfriend: checkins hidden again" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
+# 5. sync-contacts input validation
+check "sync rejects malformed hashes" "$(sync "$AT" '["nope"]')" "sha256 hex"
+
+# 6. Deleting the contact closes the door again
+sync "$BT" '[]' > /dev/null
+check "after unsync: A cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
+check "after unsync: A's mutuals are empty again" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "[]"
 
 echo "----"; echo "$PASS passed, $FAIL failed"
 exit $FAIL

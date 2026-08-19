@@ -1,5 +1,6 @@
 import Supabase
 import SwiftUI
+import UIKit
 
 struct BoardView: View {
     /// Bound to the tab selection so the gate can jump to the check-in tab.
@@ -8,12 +9,15 @@ struct BoardView: View {
     @State private var board = BoardState()
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var contactsDenied = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
                     ProgressView()
+                } else if contactsDenied {
+                    contactsPrompt
                 } else if board.mine == nil {
                     gate
                 } else {
@@ -40,6 +44,21 @@ struct BoardView: View {
         }
     }
 
+    private var contactsPrompt: some View {
+        ContentUnavailableView {
+            Label("Contacts access is off", systemImage: "person.crop.circle.badge.questionmark")
+        } description: {
+            Text("Moodring is contacts-based — friends appear automatically when you're in each other's contacts.")
+        } actions: {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
     private var grid: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
@@ -52,7 +71,7 @@ struct BoardView: View {
                 ContentUnavailableView(
                     "No friends yet",
                     systemImage: "person.2",
-                    description: Text("Add friends to see how they're doing.")
+                    description: Text("Friends appear automatically once you and they have each other in your contacts.")
                 )
             }
             if let errorMessage {
@@ -62,11 +81,17 @@ struct BoardView: View {
     }
 
     private func load() async {
-        do {
-            board = try await BoardRepository().load()
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
+        // First board visit triggers the contacts prompt; afterwards this is
+        // a no-op and isAuthorized reflects the user's answer.
+        await ContactDirectory.requestAccess()
+        contactsDenied = !ContactDirectory.isAuthorized
+        if !contactsDenied {
+            do {
+                board = try await BoardRepository().load()
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
         isLoading = false
     }
@@ -96,17 +121,17 @@ private struct BoardCard: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 56, height: 56)
+            ZStack(alignment: .bottomTrailing) {
+                avatar
                 if let emoji = entry.checkin?.emoji {
-                    Text(emoji).font(.system(size: 30))
-                } else {
-                    Image(systemName: "zzz").foregroundStyle(.secondary)
+                    Text(emoji)
+                        .font(.system(size: 24))
+                        .padding(2)
+                        .background(Circle().fill(Color(.secondarySystemGroupedBackground)))
+                        .offset(x: 8, y: 8)
                 }
             }
-            Text(entry.profile.displayName)
+            Text(entry.identity.name)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
             if entry.checkin == nil {
@@ -119,5 +144,26 @@ private struct BoardCard: View {
         .padding(.vertical, 16)
         .padding(.horizontal, 8)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    /// The contact's photo from the viewer's address book, or a monogram.
+    @ViewBuilder
+    private var avatar: some View {
+        if let data = entry.identity.photo, let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 56)
+                .clipShape(Circle())
+        } else {
+            ZStack {
+                Circle()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 56, height: 56)
+                Text(entry.identity.name.prefix(1).uppercased())
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

@@ -60,14 +60,19 @@ and window-geometry guessing; AXe needs neither.
   the leading `+`. The signup trigger hashes that form; client-side contact
   matching (`PhoneNumber.hashForMatching`) must hash the identical form or
   nothing ever matches.
-- `profiles.phone_hash` is revoked from client roles at the **column** level.
-  Consequences:
-  - Any app-side write to `profiles` must use `returning: .minimal` (or an
-    explicit column list). supabase-swift's default `.representation` selects
-    `*`, which trips the revoked column and fails the whole write with 42501.
-  - Only service-role code (Edge Functions) may read `phone_hash`, and any DB
-    function that exposes it (`match_phone_hashes`) must have EXECUTE revoked
-    from `anon`/`authenticated` — otherwise it's a phone-number oracle.
+- **The social graph is contacts-based** (no friendships table, no display
+  names): the sync-contacts Edge Function replaces the caller's
+  `contact_links` rows from hashed contact uploads, and check-in visibility
+  requires the link in BOTH directions (`are_mutual_contacts`). Names and
+  photos are resolved client-side from the viewer's own address book
+  (`ContactDirectory`), keyed by the `phone_hash` values `my_mutuals()`
+  returns — safe to echo because a mutual contact's number is by definition
+  already in the caller's address book.
+- `profiles` and `contact_links` are fully sealed from client roles (RLS on,
+  all grants revoked) — only service-role Edge Functions touch them. Any DB
+  function that exposes `phone_hash` beyond mutuals (`match_phone_hashes`)
+  must have EXECUTE revoked from `anon`/`authenticated` — otherwise it's a
+  phone-number oracle.
 - **`security definer` functions that call pgcrypto need
   `set search_path = public, extensions`** — Supabase preinstalls pgcrypto in
   the `extensions` schema, and a search_path pinned to `public` alone makes
@@ -78,7 +83,7 @@ and window-geometry guessing; AXe needs neither.
   Edit-until-midnight falls out of always targeting today — no timer logic.
 - Don't pass large arrays to PostgREST `.in()` filters — they go in the URL and
   500 past ~1000 values. Use a DB function taking an array (request body), as
-  `match-contacts` does.
+  `sync-contacts` does via `match_phone_hashes`.
 - Schema changes go through `supabase/migrations/` + `supabase db push`, never
   the dashboard. `scripts/rls-proof.sh` (env-var driven, see README) asserts
   every policy boundary against a live project — run it after RLS changes.

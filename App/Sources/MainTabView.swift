@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MainTab: Hashable {
-    case today, board, history, friends
+    case today, board, history
 }
 
 struct MainTabView: View {
@@ -18,9 +18,6 @@ struct MainTabView: View {
             HistoryView()
                 .tabItem { Label("History", systemImage: "calendar") }
                 .tag(MainTab.history)
-            FriendsView()
-                .tabItem { Label("Add", systemImage: "person.badge.plus") }
-                .tag(MainTab.friends)
         }
     }
 }

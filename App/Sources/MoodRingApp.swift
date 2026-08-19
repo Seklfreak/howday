@@ -52,22 +52,12 @@ struct RootView: View {
                 if state.session == nil {
                     stage = .signedOut
                 } else {
-                    await resolveSignedInStage()
+                    // Onboarding is just the contacts pitch — once the
+                    // permission prompt has been answered either way, there
+                    // is nothing left to set up.
+                    stage = ContactDirectory.hasBeenAsked ? .ready : .onboarding
                 }
             }
-        }
-    }
-
-    /// The signup trigger creates the profiles row with an empty display
-    /// name; onboarding is done once the user has set one.
-    private func resolveSignedInStage() async {
-        do {
-            let profile = try await ProfileRepository().myProfile()
-            stage = profile.displayName.isEmpty ? .onboarding : .ready
-        } catch {
-            // Profile fetch failed (offline, or trigger not yet applied) —
-            // fall through to onboarding, which retries on save.
-            stage = .onboarding
         }
     }
 }

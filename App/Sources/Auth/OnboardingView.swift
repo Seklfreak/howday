@@ -1,47 +1,45 @@
 import SwiftUI
 
-/// Shown once after first sign-in, until a display name is saved.
+/// Shown once after first sign-in, while the contacts permission is
+/// undecided. There is nothing else to set up: friends, names, and photos
+/// all come from the address book.
 struct OnboardingView: View {
     let onDone: () -> Void
 
-    @State private var name = ""
     @State private var isBusy = false
-    @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Your name", text: $name)
-                        .textContentType(.givenName)
-                } footer: {
-                    Text("This is what your friends see next to your mood.")
-                }
-                Section {
-                    Button(action: save) {
-                        if isBusy { ProgressView() } else { Text("Continue") }
-                    }
-                    .disabled(isBusy || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "person.2.circle")
+                .font(.system(size: 64))
+                .foregroundStyle(.tint)
+            Text("Find your friends")
+                .font(.title.weight(.semibold))
+            Text("Moodring is contacts-based: you see each other's moods once you're both in each other's contacts, shown with the name and photo from your address book. Phone numbers are hashed on your device before matching — names and photos never leave your phone.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                allow()
+            } label: {
+                Text("Allow contacts access")
+                    .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Welcome")
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(isBusy)
+            Button("Not now") { onDone() }
+                .disabled(isBusy)
         }
+        .padding(24)
     }
 
-    private func save() {
-        errorMessage = nil
+    private func allow() {
         isBusy = true
         Task {
-            do {
-                try await ProfileRepository().updateDisplayName(name.trimmingCharacters(in: .whitespaces))
-                onDone()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isBusy = false
+            await ContactDirectory.requestAccess()
+            onDone()
         }
     }
 }
