@@ -22,6 +22,33 @@ matching area.
   then reports "Auth session missing" right after a successful sign-in.
   Simulator builds sign locally without a team; the flag is for compile-checks only.
 
+## Simulator UI testing (AXe)
+
+Drive the app in the simulator with the AXe CLI (`brew install
+cameroncooke/axe/axe`) — it reads the accessibility tree and injects touches
+via the simulator's HID interface. Do NOT use `cliclick`/`screencapture`
+window automation: it needs macOS Accessibility + Screen Recording permissions
+and window-geometry guessing; AXe needs neither.
+
+- Loop: `axe describe-ui --udid <UDID>` → find the element's frame (device
+  points) → `axe tap -x -y` / `axe type` / `axe swipe`. Screenshots stay
+  `xcrun simctl io <UDID> screenshot out.png`.
+- **Always pass an explicit UDID** (`xcrun simctl list devices`). Simulator
+  names are ambiguous — this machine has two "iPhone 17 Pro" devices, and
+  boot-by-name may boot a different one than the UDID you then target
+  (`simctl bootstatus` on the other device hangs forever).
+- **Re-run `describe-ui` after anything that changes layout** (keyboard
+  appearing, a form section added/removed) — cached coordinates land on the
+  wrong element and taps "succeed" while doing nothing you wanted.
+- `axe type` is HID-keycode based, **ASCII only — it cannot type emoji**
+  (`No keycode found for character`). Instead: `printf '🥳' | xcrun simctl
+  pbcopy <UDID>`, long-press the field (`axe touch -x -y --down`, sleep ~1s,
+  `--up`), then `describe-ui` to find and tap the `Paste` callout button.
+- Sign-in uses the Supabase test phone numbers with the fixed OTP (deliberately
+  not in this repo — see README/rls-proof env). They're readable via the
+  Management API: `curl -H "Authorization: Bearer $(cat ~/.supabase/access-token)"
+  https://api.supabase.com/v1/projects/<ref>/config/auth` → `sms_test_otp`.
+
 ## Supabase / data model
 
 - **Phone hash format**: Supabase stores `auth.users.phone` as E.164 **without**
