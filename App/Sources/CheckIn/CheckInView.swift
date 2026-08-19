@@ -2,12 +2,15 @@ import Supabase
 import SwiftUI
 
 struct CheckInView: View {
-    @State private var existing: Checkin?
+    /// What the grid shows right now — updated the instant a tap lands.
+    @State private var selected: String?
+    /// The last emoji the server acknowledged, so a failed save can roll back.
+    @State private var confirmed: String?
     @State private var wildcard: String?
     @State private var isLoading = true
-    @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showSettings = false
+    @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -42,26 +45,19 @@ struct CheckInView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 24) {
                 ForEach(choices, id: \.self) { choice in
-                    EmojiButton(emoji: choice, isSelected: existing?.emoji == choice) {
+                    EmojiButton(emoji: choice, isSelected: selected == choice) {
                         lockIn(choice)
                     }
                 }
             }
             .padding(.horizontal, 24)
-            .disabled(isSaving)
-            .sensoryFeedback(.success, trigger: existing?.emoji)
+            .sensoryFeedback(.success, trigger: selected)
 
-            Group {
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
-                } else if existing != nil {
-                    Text("Checked in — tap another emoji to change it until midnight.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .font(.footnote)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 24)
+            Text(errorMessage ?? " ")
+                .foregroundStyle(.red)
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
 
             Spacer()
         }
@@ -77,26 +73,37 @@ struct CheckInView: View {
         do {
             let userId = try await Supa.client.auth.session.user.id
             wildcard = MoodEmoji.wildcard(for: userId, day: LocalDay.string())
-            existing = try await CheckinRepository().today()
+            confirmed = try await CheckinRepository().today()?.emoji
+            selected = confirmed
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    /// Tapping an emoji IS the check-in — no separate confirm step.
+    /// Tapping an emoji IS the check-in — no separate confirm step, and no
+    /// waiting on the network: the selection moves immediately and the upsert
+    /// rides along behind it. Saves are chained so rapid taps reach the server
+    /// in the order they were made and the last tap is the one that sticks.
     private func lockIn(_ choice: String) {
-        guard choice != existing?.emoji else { return }
+        guard choice != selected else { return }
+        selected = choice
         errorMessage = nil
-        isSaving = true
-        Task {
+
+        let previous = saveTask
+        saveTask = Task {
+            await previous?.value
             do {
                 try await CheckinRepository().saveToday(emoji: choice)
-                existing = try await CheckinRepository().today()
+                confirmed = choice
             } catch {
-                errorMessage = error.localizedDescription
+                // A later tap that lands supersedes this failure; only roll
+                // back if this is still what the user is looking at.
+                if selected == choice {
+                    selected = confirmed
+                    errorMessage = error.localizedDescription
+                }
             }
-            isSaving = false
         }
     }
 }
