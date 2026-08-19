@@ -126,15 +126,25 @@ private struct DayCell: View {
     let isToday: Bool
 
     var body: some View {
-        let mood = checkin.flatMap { Mood(rawValue: $0.mood) }
         RoundedRectangle(cornerRadius: 8)
-            .fill(mood?.color.opacity(0.85) ?? Color(.tertiarySystemFill))
+            .fill(Color(.tertiarySystemFill))
             .frame(height: 40)
             .overlay {
-                Text("\(day)")
-                    .font(.caption)
-                    .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(mood != nil ? Color.white : .secondary)
+                if let checkin {
+                    VStack(spacing: 0) {
+                        Text("\(day)")
+                            .font(.system(size: 9))
+                            .fontWeight(isToday ? .bold : .regular)
+                            .foregroundStyle(.secondary)
+                        Text(checkin.emoji)
+                            .font(.system(size: 17))
+                    }
+                } else {
+                    Text("\(day)")
+                        .font(.caption)
+                        .fontWeight(isToday ? .bold : .regular)
+                        .foregroundStyle(.secondary)
+                }
             }
             .overlay {
                 if isToday {
@@ -149,14 +159,7 @@ private struct CheckinDetailSheet: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            let mood = Mood(rawValue: checkin.mood)
-            HStack(spacing: 10) {
-                Circle().fill(mood?.color ?? .gray).frame(width: 28, height: 28)
-                Text(mood?.label ?? "—").font(.headline)
-                if let emoji = checkin.emoji {
-                    Text(emoji).font(.title2)
-                }
-            }
+            Text(checkin.emoji).font(.system(size: 44))
             Text(checkin.day).font(.subheadline).foregroundStyle(.secondary)
             if let note = checkin.note {
                 Text(note)

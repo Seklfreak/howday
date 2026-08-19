@@ -95,24 +95,25 @@ private struct BoardCard: View {
     let entry: BoardEntry
 
     var body: some View {
-        let mood = entry.checkin.flatMap { Mood(rawValue: $0.mood) }
         VStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(mood?.color ?? Color(.tertiarySystemFill))
+                    .fill(Color(.tertiarySystemFill))
                     .frame(width: 56, height: 56)
                 if let emoji = entry.checkin?.emoji {
-                    Text(emoji).font(.title2)
-                } else if mood == nil {
+                    Text(emoji).font(.system(size: 30))
+                } else {
                     Image(systemName: "zzz").foregroundStyle(.secondary)
                 }
             }
             Text(entry.profile.displayName)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
-            Text(mood?.label ?? "Not yet")
-                .font(.caption)
-                .foregroundStyle(mood?.color ?? Color.secondary)
+            if entry.checkin == nil {
+                Text("Not yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let note = entry.checkin?.note {
                 Text(note)
                     .font(.caption)

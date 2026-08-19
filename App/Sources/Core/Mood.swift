@@ -1,31 +1,26 @@
-import SwiftUI
+import Foundation
 
-enum Mood: Int, CaseIterable, Identifiable, Sendable {
-    case rough = 1
-    case low = 2
-    case okay = 3
-    case good = 4
-    case great = 5
+/// The five suggested check-in emoji, roughly rough → great. Any emoji is
+/// allowed — these are just the quick picks shown in the check-in form.
+enum MoodEmoji {
+    static let suggestions = ["😢", "😕", "😐", "🙂", "😄"]
+}
 
-    var id: Int { rawValue }
-
-    var label: String {
-        switch self {
-        case .rough: "Rough"
-        case .low: "Low"
-        case .okay: "Okay"
-        case .good: "Good"
-        case .great: "Great"
-        }
+extension String {
+    /// True when the string is exactly one emoji grapheme (skin tones, ZWJ
+    /// sequences, and flags all count as one).
+    var isSingleEmoji: Bool {
+        guard count == 1, let character = first else { return false }
+        let scalars = character.unicodeScalars
+        // Plain digits, #, and * report isEmoji, so additionally require
+        // emoji presentation or a multi-scalar sequence (variation selector,
+        // ZWJ, skin tone, keycap).
+        return scalars.contains { $0.properties.isEmojiPresentation }
+            || (scalars.first?.properties.isEmoji == true && scalars.count > 1)
     }
 
-    var color: Color {
-        switch self {
-        case .rough: Color(red: 0.357, green: 0.431, blue: 0.659)
-        case .low: Color(red: 0.431, green: 0.576, blue: 0.671)
-        case .okay: Color(red: 0.604, green: 0.682, blue: 0.494)
-        case .good: Color(red: 0.875, green: 0.659, blue: 0.306)
-        case .great: Color(red: 0.910, green: 0.529, blue: 0.235)
-        }
+    /// The first emoji grapheme in the string, if any.
+    var firstEmoji: String? {
+        first(where: { String($0).isSingleEmoji }).map(String.init)
     }
 }

@@ -49,8 +49,8 @@ rest "$AT" -X DELETE "$URL/rest/v1/friendships?or=(requester.eq.$AID,addressee.e
 rest "$BT" -X PATCH "$URL/rest/v1/profiles?id=eq.$BID" -d '{"display_name":"Bob Test"}' > /dev/null
 # B checks in
 rest "$BT" -X POST "$URL/rest/v1/checkins?on_conflict=user_id,day" -H 'Prefer: resolution=merge-duplicates' \
-  -d "{\"user_id\":\"$BID\",\"day\":\"$(date +%F)\",\"mood\":4,\"note\":\"secret note\"}" > /dev/null
-BCHK=$(rest "$BT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id,mood,note" | jsonget 0.id)
+  -d "{\"user_id\":\"$BID\",\"day\":\"$(date +%F)\",\"emoji\":\"🙂\",\"note\":\"secret note\"}" > /dev/null
+BCHK=$(rest "$BT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id,emoji,note" | jsonget 0.id)
 
 # 1. Strangers can't see each other
 check "stranger cannot read B's profile" "$(rest "$AT" "$URL/rest/v1/profiles?id=eq.$BID&select=id")" "[]"
@@ -84,7 +84,7 @@ rest "$BT" -X PATCH "$URL/rest/v1/friendships?id=eq.$FID" -d '{"status":"accepte
 check "accepted: A reads B's checkin" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=note")" "secret note"
 
 # 8. Friends still can't write each other's data
-check "A cannot edit B's checkin" "$(rest "$AT" -X PATCH "$URL/rest/v1/checkins?id=eq.$BCHK" -H 'Prefer: return=representation' -d '{"mood":1}')" "[]"
+check "A cannot edit B's checkin" "$(rest "$AT" -X PATCH "$URL/rest/v1/checkins?id=eq.$BCHK" -H 'Prefer: return=representation' -d '{"emoji":"😢"}')" "[]"
 check "checkin delete is revoked" "$(rest "$AT" -X DELETE "$URL/rest/v1/checkins?id=eq.$BCHK")" "permission denied"
 check "phone_hash stays hidden even from friends" "$(rest "$AT" "$URL/rest/v1/profiles?id=eq.$BID&select=phone_hash")" "permission denied"
 

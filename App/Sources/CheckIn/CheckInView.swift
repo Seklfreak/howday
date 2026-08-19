@@ -2,8 +2,8 @@ import SwiftUI
 
 struct CheckInView: View {
     @State private var existing: Checkin?
-    @State private var selectedMood: Mood?
     @State private var emoji = ""
+    @State private var customEmoji = ""
     @State private var note = ""
     @State private var isLoading = true
     @State private var isSaving = false
@@ -40,25 +40,34 @@ struct CheckInView: View {
         Form {
             Section {
                 HStack(spacing: 8) {
-                    ForEach(Mood.allCases) { mood in
-                        MoodButton(mood: mood, isSelected: selectedMood == mood) {
-                            selectedMood = mood
+                    ForEach(MoodEmoji.suggestions, id: \.self) { suggestion in
+                        EmojiButton(emoji: suggestion, isSelected: emoji == suggestion) {
+                            emoji = suggestion
+                            customEmoji = ""
                             justSaved = false
                         }
                     }
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
+                TextField("Or any other emoji", text: $customEmoji)
+                    .onChange(of: customEmoji) { _, new in
+                        justSaved = false
+                        if let picked = new.firstEmoji {
+                            emoji = picked
+                            if new != picked { customEmoji = picked }
+                        } else {
+                            // Non-emoji input is dropped; losing the custom
+                            // emoji clears the selection too.
+                            if !new.isEmpty { customEmoji = "" }
+                            if !MoodEmoji.suggestions.contains(emoji) { emoji = "" }
+                        }
+                    }
             } header: {
                 Text(existing == nil ? "How are you today?" : "Today's check-in")
             }
 
             Section {
-                TextField("Emoji (optional)", text: $emoji)
-                    .onChange(of: emoji) { _, new in
-                        if new.count > 2 { emoji = String(new.prefix(2)) }
-                        justSaved = false
-                    }
                 TextField("Add a note (optional)", text: $note, axis: .vertical)
                     .lineLimit(2...4)
                     .onChange(of: note) { _, new in
@@ -77,7 +86,7 @@ struct CheckInView: View {
                         Text(existing == nil ? "Check in" : "Update check-in")
                     }
                 }
-                .disabled(isSaving || selectedMood == nil || justSaved)
+                .disabled(isSaving || emoji.isEmpty || justSaved)
             } footer: {
                 if existing != nil {
                     Text("You can edit today's check-in until midnight.")
@@ -108,8 +117,10 @@ struct CheckInView: View {
         do {
             existing = try await CheckinRepository().today()
             if let existing {
-                selectedMood = Mood(rawValue: existing.mood)
-                emoji = existing.emoji ?? ""
+                emoji = existing.emoji
+                if !MoodEmoji.suggestions.contains(existing.emoji) {
+                    customEmoji = existing.emoji
+                }
                 note = existing.note ?? ""
             }
         } catch {
@@ -119,12 +130,12 @@ struct CheckInView: View {
     }
 
     private func save() {
-        guard let mood = selectedMood else { return }
+        guard !emoji.isEmpty else { return }
         errorMessage = nil
         isSaving = true
         Task {
             do {
-                try await CheckinRepository().saveToday(mood: mood, emoji: emoji, note: note)
+                try await CheckinRepository().saveToday(emoji: emoji, note: note)
                 existing = try await CheckinRepository().today()
                 justSaved = true
             } catch {
@@ -135,30 +146,26 @@ struct CheckInView: View {
     }
 }
 
-private struct MoodButton: View {
-    let mood: Mood
+private struct EmojiButton: View {
+    let emoji: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Circle()
-                    .fill(mood.color)
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        if isSelected {
-                            Circle().strokeBorder(.primary, lineWidth: 3)
-                        }
+            Text(emoji)
+                .font(.system(size: 28))
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(isSelected ? Color.accentColor.opacity(0.2) : Color(.tertiarySystemFill)))
+                .overlay {
+                    if isSelected {
+                        Circle().strokeBorder(Color.accentColor, lineWidth: 2)
                     }
-                Text(mood.label)
-                    .font(.caption2)
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-            }
-            .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(mood.label) mood")
+        .accessibilityLabel("\(emoji) mood")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
