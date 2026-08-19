@@ -1,7 +1,19 @@
 #!/bin/zsh
-# Two-account RLS proof for Moodring (M2 done-condition).
-URL=https://qmwwmzxsiwgapoacodzs.supabase.co
-KEY=sb_publishable_zybAL01trBaV2XQ00JfKIw_nNClafyP
+# Two-account RLS proof for Moodring: exercises the full friendship
+# lifecycle against a live project and asserts every policy boundary.
+#
+# Required environment:
+#   MOODRING_URL     — project URL, e.g. https://<ref>.supabase.co
+#   MOODRING_KEY     — publishable (anon) API key
+#   TEST_PHONE_A     — first test phone number, digits only (e.g. 15005550001)
+#   TEST_PHONE_B     — second test phone number, digits only
+#   TEST_OTP         — the fixed OTP configured for both test numbers
+#     (Supabase dashboard: Authentication -> Phone -> Test OTPs)
+for v in MOODRING_URL MOODRING_KEY TEST_PHONE_A TEST_PHONE_B TEST_OTP; do
+  [[ -n "${(P)v}" ]] || { echo "missing env: $v"; exit 2 }
+done
+URL=$MOODRING_URL
+KEY=$MOODRING_KEY
 PASS=0; FAIL=0
 check() { # $1 label, $2 actual, $3 expected-substring-or-exact
   if [[ "$2" == *"$3"* ]]; then echo "PASS: $1"; ((PASS++));
@@ -16,19 +28,22 @@ print(d if isinstance(d,str) else json.dumps(d))" "$1"; }
 
 signin() { # $1 phone-without-plus -> prints access_token|user_id
   curl -s -X POST "$URL/auth/v1/otp" -H "apikey: $KEY" -H 'Content-Type: application/json' -d "{\"phone\":\"+$1\"}" > /dev/null
-  R=$(curl -s -X POST "$URL/auth/v1/verify" -H "apikey: $KEY" -H 'Content-Type: application/json' -d "{\"type\":\"sms\",\"phone\":\"+$1\",\"token\":\"123456\"}")
+  R=$(curl -s -X POST "$URL/auth/v1/verify" -H "apikey: $KEY" -H 'Content-Type: application/json' -d "{\"type\":\"sms\",\"phone\":\"+$1\",\"token\":\"$TEST_OTP\"}")
   echo "$(echo "$R" | jsonget access_token)|$(echo "$R" | jsonget user.id)"
 }
 
-A=$(signin 15005550001); AT=${A%|*}; AID=${A#*|}
-B=$(signin 15005550002); BT=${B%|*}; BID=${B#*|}
-[[ -n "$AT" && -n "$BT" ]] || { echo "sign-in failed"; exit 1; }
+A=$(signin "$TEST_PHONE_A"); AT=${A%|*}; AID=${A#*|}
+B=$(signin "$TEST_PHONE_B"); BT=${B%|*}; BID=${B#*|}
+[[ -n "$AT" && -n "$BT" ]] || { echo "sign-in failed"; exit 1 }
 echo "A=$AID  B=$BID"
 
 rest() { # $1 token, then curl args
   local T=$1; shift
   curl -s -H "apikey: $KEY" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' "$@"
 }
+
+# Clean slate: drop any A-B relationship left over from earlier runs.
+rest "$AT" -X DELETE "$URL/rest/v1/friendships?or=(requester.eq.$AID,addressee.eq.$AID)" > /dev/null
 
 # B sets a display name (returning minimal)
 rest "$BT" -X PATCH "$URL/rest/v1/profiles?id=eq.$BID" -d '{"display_name":"Bob Test"}' > /dev/null
@@ -42,7 +57,7 @@ check "stranger cannot read B's profile" "$(rest "$AT" "$URL/rest/v1/profiles?id
 check "stranger cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
 
 # 2. Contact matching finds B for A (Edge Function, service role)
-BHASH=$(python3 -c "import hashlib;print(hashlib.sha256(b'15005550002').hexdigest())")
+BHASH=$(python3 -c "import hashlib,os;print(hashlib.sha256(os.environ['TEST_PHONE_B'].encode()).hexdigest())")
 MATCH=$(rest "$AT" -X POST "$URL/functions/v1/match-contacts" -d "{\"hashes\":[\"$BHASH\"]}")
 check "match-contacts returns B" "$MATCH" "$BID"
 check "match-contacts returns B's name" "$MATCH" "Bob Test"

@@ -1,9 +1,11 @@
 # Moodring
 
-One mood check-in a day; see how your friends are doing. iOS (SwiftUI, iOS 17+)
-with a Supabase backend and phone-number sign-in via Twilio Verify.
+One mood check-in a day; see how your friends are doing. You can't see your
+friends' moods until you've shared yours. iOS (SwiftUI, iOS 17+) with a
+Supabase backend and phone-number sign-in via Twilio Verify.
 
-Build plan: https://claude.ai/code/artifact/f44b4ae4-1753-49e6-8f0d-9f18084be5fe
+Source-visible, all rights reserved — no license is granted for reuse or
+redistribution.
 
 ## Repo layout
 
@@ -55,4 +57,7 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
 - Privacy lives in RLS, not in the app: friends with `accepted` status can
-  read your check-ins, nobody else.
+  read your check-ins, nobody else. `scripts/rls-proof.sh` asserts every
+  policy boundary against a live project — it needs `MOODRING_URL`,
+  `MOODRING_KEY`, `TEST_PHONE_A/B`, and `TEST_OTP` in the environment
+  (configure test numbers under Authentication → Phone → Test OTPs).
