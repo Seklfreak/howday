@@ -20,6 +20,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSContactsUsageDescription</key>
 	<string>Moodring reads your contacts only to find friends who already use the app. Phone numbers are hashed on your device before matching and are never stored on the server.</string>
 	<key>SUPABASE_ANON_KEY</key>
