@@ -37,15 +37,14 @@ Deno.serve(async (req) => {
   }
 
   // Service role: the phone_hash column is revoked from client roles.
+  // rpc() sends the hash array in the request body — .in() would put it in
+  // the URL, which breaks past ~1000 hashes.
   const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data, error } = await admin
-    .from("profiles")
-    .select("id, display_name, phone_hash")
-    .in("phone_hash", hashes)
-    .neq("id", user.id);
+  const { data: rows, error } = await admin.rpc("match_phone_hashes", { hashes });
   if (error) {
     return json({ error: error.message }, 500);
   }
+  const data = rows.filter((r: { id: string }) => r.id !== user.id);
 
   // phone_hash is echoed back so the client can map matches onto the local
   // contact (it already knows these hashes — no new information leaks).
