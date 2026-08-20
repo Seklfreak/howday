@@ -20,16 +20,20 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                } else if selected == nil {
-                    picker
-                } else {
-                    board
+            ZStack {
+                MoodBackground(theme: currentTheme)
+                Group {
+                    if isLoading {
+                        ProgressView()
+                    } else if selected == nil {
+                        picker
+                    } else {
+                        board
+                    }
                 }
             }
             .navigationTitle(Date.now.formatted(.dateTime.weekday(.wide).month().day()))
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 NavigationLink {
                     HistoryView()
@@ -47,6 +51,13 @@ struct HomeView: View {
             }
             .task { await load() }
         }
+        .tint(currentTheme.accent)
+    }
+
+    /// The theme everything on this screen derives from: your mood's colors
+    /// once you've picked, the unworn ring's pearl-neutral before.
+    private var currentTheme: MoodTheme {
+        MoodTheme.forEmoji(selected)
     }
 
     private var picker: some View {
@@ -58,7 +69,7 @@ struct HomeView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 24) {
                 ForEach(choices, id: \.self) { choice in
-                    EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 100, fontSize: 64) {
+                    EmojiButton(emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard, diameter: 100, fontSize: 64) {
                         lockIn(choice)
                     }
                     .frame(maxWidth: .infinity)
@@ -86,7 +97,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     if isChangingMood {
                         ForEach(choices, id: \.self) { choice in
-                            EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 48, fontSize: 30) {
+                            EmojiButton(emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard, diameter: 48, fontSize: 30) {
                                 lockIn(choice)
                                 withAnimation { isChangingMood = false }
                             }
@@ -165,21 +176,33 @@ struct HomeView: View {
 private struct EmojiButton: View {
     let emoji: String
     let isSelected: Bool
+    var isWildcard = false
     let diameter: CGFloat
     let fontSize: CGFloat
     let action: () -> Void
+
+    /// Each button rings and glows in its own mood's color, not a shared
+    /// accent — the ring wears the color it would turn.
+    private var theme: MoodTheme { MoodTheme.forEmoji(emoji) }
 
     var body: some View {
         Button(action: action) {
             Text(emoji)
                 .font(.system(size: fontSize))
                 .frame(width: diameter, height: diameter)
-                .background(Circle().fill(isSelected ? Color.accentColor.opacity(0.2) : Color(.tertiarySystemFill)))
+                .background(Circle().fill(.white.opacity(isSelected ? 0.10 : 0.06)))
                 .overlay {
                     if isSelected {
-                        Circle().strokeBorder(Color.accentColor, lineWidth: diameter > 60 ? 3 : 2)
+                        Circle().strokeBorder(theme.accent, lineWidth: diameter > 60 ? 3 : 2.5)
+                    } else {
+                        // The daily wildcard keeps a dashed "surprise" ring.
+                        Circle().strokeBorder(
+                            .white.opacity(0.12),
+                            style: StrokeStyle(lineWidth: 1.5, dash: isWildcard ? [6, 5] : [])
+                        )
                     }
                 }
+                .shadow(color: isSelected ? theme.accent.opacity(0.55) : .clear, radius: 10)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(emoji) mood")

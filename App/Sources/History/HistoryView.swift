@@ -22,6 +22,12 @@ struct HistoryView: View {
             }
             .padding()
         }
+        .background {
+            // Neutral by design: a month holds many moods — the cells carry
+            // the color, the backdrop stays the unworn ring.
+            MoodBackground(theme: .neutral)
+        }
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("History")
         .task(id: monthKey) { await load() }
         .sheet(item: $selected) { checkin in
@@ -94,7 +100,10 @@ struct HistoryView: View {
 
     private var dayGrid: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-            ForEach(0..<leadingBlanks, id: \.self) { _ in
+            // Negative ids: LazyVGrid flattens identity across all its
+            // ForEach children, so blank ids overlapping day numbers (1...)
+            // silently drop those day cells.
+            ForEach(-leadingBlanks..<0, id: \.self) { _ in
                 Color.clear.frame(height: 40)
             }
             ForEach(1...daysInMonth, id: \.self) { day in
@@ -128,10 +137,20 @@ private struct DayCell: View {
     let checkin: Checkin?
     let isToday: Bool
 
+    /// The day's mood colors — nil for days without a check-in, which stay
+    /// a faint neutral so the month reads as a color story at arm's length.
+    private var theme: MoodTheme? {
+        checkin.map { MoodTheme.forEmoji($0.emoji) }
+    }
+
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
-            .fill(Color(.tertiarySystemFill))
+            .fill(theme?.accent.opacity(0.22) ?? .white.opacity(0.045))
             .frame(height: 40)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(theme?.accent.opacity(0.35) ?? .white.opacity(0.05), lineWidth: 1)
+            }
             .overlay {
                 if let checkin {
                     VStack(spacing: 0) {
@@ -151,7 +170,8 @@ private struct DayCell: View {
             }
             .overlay {
                 if isToday {
-                    RoundedRectangle(cornerRadius: 8).strokeBorder(.primary, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(theme?.accent ?? .primary, lineWidth: 1.5)
                 }
             }
     }
@@ -160,11 +180,27 @@ private struct DayCell: View {
 private struct CheckinDetailSheet: View {
     let checkin: Checkin
 
+    private var theme: MoodTheme { MoodTheme.forEmoji(checkin.emoji) }
+
+    /// "Wednesday, August 19" instead of the stored "2026-08-19".
+    private var dateText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: checkin.day) else { return checkin.day }
+        return date.formatted(.dateTime.weekday(.wide).month(.wide).day())
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
-            Text(checkin.emoji).font(.system(size: 44))
-            Text(checkin.day).font(.subheadline).foregroundStyle(.secondary)
+        VStack(spacing: 16) {
+            Text(checkin.emoji)
+                .font(.system(size: 44))
+                .frame(width: 84, height: 84)
+                .background(Circle().fill(.white.opacity(0.07)))
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 3))
+                .shadow(color: theme.accent.opacity(0.55), radius: 12)
+            Text(dateText).font(.subheadline).foregroundStyle(.secondary)
         }
         .padding()
+        .presentationBackground(theme.deep)
     }
 }

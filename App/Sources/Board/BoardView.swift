@@ -144,16 +144,27 @@ private struct BoardCard: View {
         }
     }
 
+    /// The friend's mood-ring color — nil until they've checked in today,
+    /// which renders as a ring that's "off".
+    private var ringTheme: MoodTheme? {
+        entry.checkin.map { MoodTheme.forEmoji($0.emoji) }
+    }
+
     private var card: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
                 avatar
+                    .padding(4)
+                    .overlay {
+                        Circle().strokeBorder(ringTheme?.accent ?? .white.opacity(0.16), lineWidth: 2.5)
+                    }
+                    .shadow(color: ringTheme?.accent.opacity(0.5) ?? .clear, radius: 8)
                 if let emoji = entry.checkin?.emoji {
                     Text(emoji)
-                        .font(.system(size: 24))
-                        .padding(2)
-                        .background(Circle().fill(Color(.secondarySystemGroupedBackground)))
-                        .offset(x: 8, y: 8)
+                        .font(.system(size: 18))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color(red: 0.13, green: 0.12, blue: 0.17)))
+                        .offset(x: 5, y: 5)
                 }
             }
             Text(entry.identity.name)
@@ -168,7 +179,10 @@ private struct BoardCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
         .padding(.horizontal, 8)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.07))
+        }
     }
 
     /// The contact's photo from the viewer's address book, or a monogram.
@@ -183,7 +197,7 @@ private struct BoardCard: View {
         } else {
             ZStack {
                 Circle()
-                    .fill(Color(.tertiarySystemFill))
+                    .fill(.white.opacity(0.08))
                     .frame(width: 56, height: 56)
                 Text(entry.identity.name.prefix(1).uppercased())
                     .font(.title3.weight(.semibold))

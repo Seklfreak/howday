@@ -54,6 +54,8 @@ struct RootView: View {
                 HomeView()
             }
         }
+        .fontDesign(.rounded)
+        .tint(MoodTheme.brand.accent)
         .onChange(of: stage) {
             // Every launch that reaches the signed-in UI re-registers, so a
             // rotated APNs token is re-uploaded without any bookkeeping.

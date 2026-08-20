@@ -65,6 +65,9 @@ targets:
         CFBundleDisplayName: Moodring
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The design language is dark-first liquid crystal — the app is
+        # dark-only by design, not just dark-compatible.
+        UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
         SUPABASE_URL: $(SUPABASE_URL)
