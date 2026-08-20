@@ -51,7 +51,7 @@ struct RootView: View {
             case .onboarding:
                 OnboardingView { stage = .ready }
             case .ready:
-                MainTabView()
+                HomeView()
             }
         }
         .onChange(of: stage) {

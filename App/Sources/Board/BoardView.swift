@@ -2,10 +2,10 @@ import Supabase
 import SwiftUI
 import UIKit
 
+/// The friends board, embedded below the mood bar on the home screen.
+/// HomeView only mounts it once today's check-in exists, so the old
+/// "check in first" gate lives there now — the picker IS the gate.
 struct BoardView: View {
-    /// Bound to the tab selection so the gate can jump to the check-in tab.
-    @Binding var tabSelection: MainTab
-
     @Environment(\.scenePhase) private var scenePhase
     @State private var board = BoardState()
     @State private var isLoading = true
@@ -13,40 +13,25 @@ struct BoardView: View {
     @State private var contactsDenied = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                } else if contactsDenied {
-                    contactsPrompt
-                } else if board.mine == nil {
-                    gate
-                } else {
-                    grid
-                }
-            }
-            .navigationTitle("Friends today")
-            .task { await listenForChanges() }
-            .refreshable { await load() }
-            .onChange(of: scenePhase) {
-                // Coming back to the foreground: the socket may have dropped
-                // and missed events are never replayed — refetch. This is
-                // also what makes a notification tap land on fresh data.
-                if scenePhase == .active {
-                    Task { await load() }
-                }
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if contactsDenied {
+                contactsPrompt
+            } else {
+                grid
             }
         }
-    }
-
-    private var gate: some View {
-        ContentUnavailableView {
-            Label("Check in first", systemImage: "lock")
-        } description: {
-            Text("Your friends' moods unlock once you've shared yours for today.")
-        } actions: {
-            Button("Check in") { tabSelection = .today }
-                .buttonStyle(.borderedProminent)
+        .task { await listenForChanges() }
+        .refreshable { await load() }
+        .onChange(of: scenePhase) {
+            // Coming back to the foreground: the socket may have dropped
+            // and missed events are never replayed — refetch. This is
+            // also what makes a notification tap land on fresh data.
+            if scenePhase == .active {
+                Task { await load() }
+            }
         }
     }
 

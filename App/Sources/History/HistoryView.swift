@@ -8,25 +8,25 @@ struct HistoryView: View {
 
     private var calendar: Calendar { .current }
 
+    // Pushed from HomeView's toolbar, so it rides the home NavigationStack
+    // rather than owning one.
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    monthHeader
-                    weekdayHeader
-                    dayGrid
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red).font(.footnote)
-                    }
+        ScrollView {
+            VStack(spacing: 16) {
+                monthHeader
+                weekdayHeader
+                dayGrid
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red).font(.footnote)
                 }
-                .padding()
             }
-            .navigationTitle("History")
-            .task(id: monthKey) { await load() }
-            .sheet(item: $selected) { checkin in
-                CheckinDetailSheet(checkin: checkin)
-                    .presentationDetents([.height(220)])
-            }
+            .padding()
+        }
+        .navigationTitle("History")
+        .task(id: monthKey) { await load() }
+        .sheet(item: $selected) { checkin in
+            CheckinDetailSheet(checkin: checkin)
+                .presentationDetents([.height(220)])
         }
     }
 

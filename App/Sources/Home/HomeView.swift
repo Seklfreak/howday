@@ -1,8 +1,12 @@
 import Supabase
 import SwiftUI
 
-struct CheckInView: View {
-    /// What the grid shows right now — updated the instant a tap lands.
+/// The app's single screen. Until you've checked in, the mood picker fills
+/// it; picking an emoji IS the check-in, and the friends board takes over
+/// with the picker collapsed into a compact bar for changing your mind.
+/// History and Settings live in the toolbar — there are no tabs.
+struct HomeView: View {
+    /// What the picker shows right now — updated the instant a tap lands.
     @State private var selected: String?
     /// The last emoji the server acknowledged, so a failed save can roll back.
     @State private var confirmed: String?
@@ -17,12 +21,19 @@ struct CheckInView: View {
             Group {
                 if isLoading {
                     ProgressView()
-                } else {
+                } else if selected == nil {
                     picker
+                } else {
+                    board
                 }
             }
             .navigationTitle(Date.now.formatted(.dateTime.weekday(.wide).month().day()))
             .toolbar {
+                NavigationLink {
+                    HistoryView()
+                } label: {
+                    Image(systemName: "calendar")
+                }
                 Button {
                     showSettings = true
                 } label: {
@@ -45,9 +56,10 @@ struct CheckInView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 24) {
                 ForEach(choices, id: \.self) { choice in
-                    EmojiButton(emoji: choice, isSelected: selected == choice) {
+                    EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 100, fontSize: 64) {
                         lockIn(choice)
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 24)
@@ -60,6 +72,35 @@ struct CheckInView: View {
                 .padding(.horizontal, 24)
 
             Spacer()
+        }
+    }
+
+    /// Checked in: the same six choices, shrunk to a bar you can retap to
+    /// change today's mood, with the friends board underneath.
+    private var board: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 6) {
+                HStack(spacing: 10) {
+                    ForEach(choices, id: \.self) { choice in
+                        EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 48, fontSize: 30) {
+                            lockIn(choice)
+                        }
+                    }
+                }
+                .sensoryFeedback(.success, trigger: selected)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+            }
+            .padding(.vertical, 8)
+
+            Divider()
+
+            BoardView()
         }
     }
 
@@ -76,7 +117,7 @@ struct CheckInView: View {
             confirmed = try await CheckinRepository().today()?.emoji
             selected = confirmed
         } catch {
-            // Leaving the tab cancels the .task mid-request; don't show
+            // Backgrounding can cancel the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
             guard !error.isCancellation else { return }
             errorMessage = error.localizedDescription
@@ -90,7 +131,7 @@ struct CheckInView: View {
     /// in the order they were made and the last tap is the one that sticks.
     private func lockIn(_ choice: String) {
         guard choice != selected else { return }
-        selected = choice
+        withAnimation { selected = choice }
         errorMessage = nil
 
         let previous = saveTask
@@ -103,7 +144,7 @@ struct CheckInView: View {
                 // A later tap that lands supersedes this failure; only roll
                 // back if this is still what the user is looking at.
                 if selected == choice {
-                    selected = confirmed
+                    withAnimation { selected = confirmed }
                     errorMessage = error.localizedDescription
                 }
             }
@@ -114,20 +155,21 @@ struct CheckInView: View {
 private struct EmojiButton: View {
     let emoji: String
     let isSelected: Bool
+    let diameter: CGFloat
+    let fontSize: CGFloat
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(emoji)
-                .font(.system(size: 64))
-                .frame(width: 100, height: 100)
+                .font(.system(size: fontSize))
+                .frame(width: diameter, height: diameter)
                 .background(Circle().fill(isSelected ? Color.accentColor.opacity(0.2) : Color(.tertiarySystemFill)))
                 .overlay {
                     if isSelected {
-                        Circle().strokeBorder(Color.accentColor, lineWidth: 3)
+                        Circle().strokeBorder(Color.accentColor, lineWidth: diameter > 60 ? 3 : 2)
                     }
                 }
-                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(emoji) mood")
