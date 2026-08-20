@@ -49,12 +49,29 @@ enum ContactDirectory {
     private actor State {
         private(set) var index: [String: Identity]?
         private(set) var needsSync = true
+        private var lastSync: Task<Void, Never>?
 
         func setIndex(_ new: [String: Identity]) { index = new }
         func clearNeedsSync() { needsSync = false }
         func markDirty(dropIndex: Bool) {
             needsSync = true
             if dropIndex { index = nil }
+        }
+
+        /// Chain sync attempts instead of running them concurrently: board
+        /// load, foregrounding, and a contacts change can all fire at once,
+        /// and parallel sync-contacts calls raced each other server-side.
+        /// Each queued attempt re-checks needsSync, so followers of a
+        /// successful sync are no-ops while a mid-flight contacts change
+        /// still gets a fresh upload afterwards.
+        func enqueueSync(_ attempt: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
+            let previous = lastSync
+            let task = Task {
+                await previous?.value
+                await attempt()
+            }
+            lastSync = task
+            return task
         }
     }
 
@@ -91,19 +108,22 @@ enum ContactDirectory {
         guard isAuthorized,
               (try? await Supa.client.auth.session) != nil,
               await state.needsSync else { return }
-        do {
-            try await withTrace("contacts.sync") {
-                let index = try await currentIndex()
-                struct SyncResult: Decodable { let linked: Int }
-                let _: SyncResult = try await Supa.client.functions.invoke(
-                    "sync-contacts",
-                    options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
-                )
+        await state.enqueueSync {
+            guard await state.needsSync else { return }
+            do {
+                try await withTrace("contacts.sync") {
+                    let index = try await currentIndex()
+                    struct SyncResult: Decodable { let linked: Int }
+                    let _: SyncResult = try await Supa.client.functions.invoke(
+                        "sync-contacts",
+                        options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
+                    )
+                }
+                await state.clearNeedsSync()
+            } catch {
+                // Stale links only mean stale visibility; the retry is free.
             }
-            await state.clearNeedsSync()
-        } catch {
-            // Stale links only mean stale visibility; the retry is free.
-        }
+        }.value
     }
 
     /// The caller's mutual contacts with locally-resolved identities. Does

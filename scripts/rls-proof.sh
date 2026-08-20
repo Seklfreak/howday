@@ -92,6 +92,8 @@ R=$(rest "$AT" -X POST "$URL/rest/v1/rpc/register_device_token" -d "{\"device_to
 check "A registers a device token via rpc" "${R:-ok}" "ok"
 check "push recipient fan-out is service-role only" \
   "$(rest "$AT" -X POST "$URL/rest/v1/rpc/checkin_push_recipients" -d "{\"author\":\"$AID\"}")" "permission denied"
+check "link replace rpc is service-role only" \
+  "$(rest "$AT" -X POST "$URL/rest/v1/rpc/replace_contact_links" -d "{\"owner\":\"$AID\",\"ids\":[]}")" "permission denied"
 rest "$AT" -X POST "$URL/rest/v1/rpc/unregister_device_token" -d "{\"device_token\":\"$FAKE_TOKEN\"}" > /dev/null
 
 # 5. sync-contacts input validation

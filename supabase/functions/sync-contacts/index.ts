@@ -60,26 +60,24 @@ Deno.serve(async (req) => {
   if (error) {
     return json({ error: error.message }, 500);
   }
-  const links = rows
+  const ids = rows
     .filter((r: { id: string }) => r.id !== user.id)
-    .map((r: { id: string }) => ({ owner_id: user.id, user_id: r.id }));
+    .map((r: { id: string }) => r.id);
 
   // Replace, don't merge: deleting someone from your contacts must delete
   // the link too — that is how mutuality (and their view of you) ends.
-  const del = await admin.from("contact_links").delete().eq(
-    "owner_id",
-    user.id,
+  // One RPC, not delete-then-insert from here: concurrent invocations
+  // (board load + foreground re-sync firing together) interleaved the two
+  // statements and the loser 500'd on the primary key. The DB function is
+  // transactional and serialized per owner via an advisory lock.
+  const { data: linked, error: replaceError } = await admin.rpc(
+    "replace_contact_links",
+    { owner: user.id, ids },
   );
-  if (del.error) {
-    return json({ error: del.error.message }, 500);
+  if (replaceError) {
+    return json({ error: replaceError.message }, 500);
   }
-  if (links.length > 0) {
-    const ins = await admin.from("contact_links").insert(links);
-    if (ins.error) {
-      return json({ error: ins.error.message }, 500);
-    }
-  }
-  return json({ linked: links.length });
+  return json({ linked });
 });
 
 function json(body: unknown, status = 200): Response {
