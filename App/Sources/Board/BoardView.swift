@@ -96,7 +96,7 @@ struct BoardView: View {
             // since the last upload.
             await ContactDirectory.syncIfNeeded()
             do {
-                board = try await BoardRepository().load()
+                board = try await withTrace("board.load") { try await BoardRepository().load() }
                 errorMessage = nil
             } catch {
                 // Leaving the tab cancels the .task mid-request; don't show

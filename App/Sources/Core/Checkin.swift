@@ -61,17 +61,19 @@ struct CheckinRepository {
     /// day, which is what enforces "editable until midnight": yesterday's row
     /// simply can't be addressed from the UI.
     func saveToday(emoji: String) async throws {
-        let userId = try await Supa.client.auth.session.user.id
-        let payload = CheckinPayload(
-            userId: userId,
-            day: LocalDay.string(),
-            emoji: emoji,
-            updatedAt: ISO8601DateFormatter().string(from: .now)
-        )
-        try await Supa.client
-            .from("checkins")
-            .upsert(payload, onConflict: "user_id,day", returning: .minimal)
-            .execute()
+        try await withTrace("checkin.save") {
+            let userId = try await Supa.client.auth.session.user.id
+            let payload = CheckinPayload(
+                userId: userId,
+                day: LocalDay.string(),
+                emoji: emoji,
+                updatedAt: ISO8601DateFormatter().string(from: .now)
+            )
+            try await Supa.client
+                .from("checkins")
+                .upsert(payload, onConflict: "user_id,day", returning: .minimal)
+                .execute()
+        }
     }
 
     /// The signed-in user's check-ins between two local days (inclusive),

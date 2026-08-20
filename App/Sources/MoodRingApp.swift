@@ -13,6 +13,12 @@ struct MoodRingApp: App {
         if let dsn = AppConfig.sentryDSN {
             SentrySDK.start { options in
                 options.dsn = dsn
+                // Tracing: every withTrace flow becomes a transaction with
+                // per-request Supabase spans (automatic network tracking),
+                // and failed-request capture (on by default) reports 5xx
+                // responses. Full sampling is fine at this user count —
+                // dial down before it ever dents the Sentry quota.
+                options.tracesSampleRate = 1.0
             }
         }
         #endif

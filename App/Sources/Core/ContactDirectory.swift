@@ -90,12 +90,14 @@ enum ContactDirectory {
               (try? await Supa.client.auth.session) != nil,
               await state.needsSync else { return }
         do {
-            let index = try await currentIndex()
-            struct SyncResult: Decodable { let linked: Int }
-            let _: SyncResult = try await Supa.client.functions.invoke(
-                "sync-contacts",
-                options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
-            )
+            try await withTrace("contacts.sync") {
+                let index = try await currentIndex()
+                struct SyncResult: Decodable { let linked: Int }
+                let _: SyncResult = try await Supa.client.functions.invoke(
+                    "sync-contacts",
+                    options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
+                )
+            }
             await state.clearNeedsSync()
         } catch {
             // Stale links only mean stale visibility; the retry is free.
