@@ -69,7 +69,10 @@ struct HomeView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 24) {
                 ForEach(choices, id: \.self) { choice in
-                    EmojiButton(emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard, diameter: 100, fontSize: 64) {
+                    EmojiButton(
+                        emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
+                        diameter: 100, fontSize: 64
+                    ) {
                         lockIn(choice)
                     }
                     .frame(maxWidth: .infinity)
@@ -97,7 +100,10 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     if isChangingMood {
                         ForEach(choices, id: \.self) { choice in
-                            EmojiButton(emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard, diameter: 48, fontSize: 30) {
+                            EmojiButton(
+                                emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
+                                diameter: 48, fontSize: 30
+                            ) {
                                 lockIn(choice)
                                 withAnimation { isChangingMood = false }
                             }
