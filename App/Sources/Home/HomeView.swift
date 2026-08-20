@@ -14,6 +14,8 @@ struct HomeView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showSettings = false
+    /// Whether the collapsed mood bar is spread open to offer all choices.
+    @State private var isChangingMood = false
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
@@ -75,15 +77,23 @@ struct HomeView: View {
         }
     }
 
-    /// Checked in: the same six choices, shrunk to a bar you can retap to
-    /// change today's mood, with the friends board underneath.
+    /// Checked in: just your mood, with the friends board underneath.
+    /// Tapping the emoji spreads the bar back into the six choices; picking
+    /// one (or retapping your current mood) collapses it again.
     private var board: some View {
         VStack(spacing: 0) {
             VStack(spacing: 6) {
                 HStack(spacing: 10) {
-                    ForEach(choices, id: \.self) { choice in
-                        EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 48, fontSize: 30) {
-                            lockIn(choice)
+                    if isChangingMood {
+                        ForEach(choices, id: \.self) { choice in
+                            EmojiButton(emoji: choice, isSelected: selected == choice, diameter: 48, fontSize: 30) {
+                                lockIn(choice)
+                                withAnimation { isChangingMood = false }
+                            }
+                        }
+                    } else if let selected {
+                        EmojiButton(emoji: selected, isSelected: true, diameter: 48, fontSize: 30) {
+                            withAnimation { isChangingMood = true }
                         }
                     }
                 }
