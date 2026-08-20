@@ -15,6 +15,11 @@
       "description": "Major updates: open a PR but require manual review/merge.",
       "matchUpdateTypes": ["major"],
       "automerge": false
+    },
+    {
+      "description": "supabase-swift git tags are v-prefixed, but SPM from: requirements in project.yml must be plain semver — xcodebuild crashes parsing 'v2.55.1'.",
+      "matchSourceUrls": ["https://github.com/supabase/supabase-swift"],
+      "extractVersion": "^v?(?<version>.+)$"
     }
   ]
 }
