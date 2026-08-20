@@ -23,6 +23,8 @@ enum ContactDirectory {
     struct Identity: Sendable, Hashable {
         let name: String
         let photo: Data?
+        /// The matched number as saved in the address book, for sms: links.
+        let phone: String?
     }
 
     /// Whether the system permission prompt has been answered (either way).
@@ -115,7 +117,7 @@ enum ContactDirectory {
             .execute()
             .value
         return mutuals.map {
-            ($0.id, index[$0.phoneHash] ?? Identity(name: "Friend", photo: nil))
+            ($0.id, index[$0.phoneHash] ?? Identity(name: "Friend", photo: nil, phone: nil))
         }
     }
 
@@ -149,8 +151,12 @@ enum ContactDirectory {
                 let name = contact.givenName.isEmpty
                     ? (contact.familyName.isEmpty ? "Friend" : contact.familyName)
                     : contact.givenName
-                let identity = Identity(name: name, photo: contact.thumbnailImageData)
                 for phone in contact.phoneNumbers {
+                    let identity = Identity(
+                        name: name,
+                        photo: contact.thumbnailImageData,
+                        phone: phone.value.stringValue
+                    )
                     for candidate in candidates(for: phone.value.stringValue) {
                         index[PhoneNumber.hashForMatching(e164: candidate)] = identity
                     }

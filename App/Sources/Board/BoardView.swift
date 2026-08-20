@@ -120,7 +120,31 @@ struct BoardView: View {
 private struct BoardCard: View {
     let entry: BoardEntry
 
+    /// Tapping a friend starts a chat with them. sms: goes to the system's
+    /// default messaging app (user-selectable since iOS 18.2), so this lands
+    /// in whatever chat app the user actually uses for that person's number.
+    private var messageURL: URL? {
+        guard let phone = entry.identity.phone else { return nil }
+        let dialable = phone.filter { $0.isNumber || $0 == "+" }
+        guard !dialable.isEmpty else { return nil }
+        return URL(string: "sms:\(dialable)")
+    }
+
     var body: some View {
+        if let messageURL {
+            Button {
+                UIApplication.shared.open(messageURL)
+            } label: {
+                card
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens a chat with \(entry.identity.name)")
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: 8) {
             ZStack(alignment: .bottomTrailing) {
                 avatar
