@@ -7,7 +7,7 @@ options:
 packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
-    from: 2.5.0
+    from: 2.55.1
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     from: 9.26.0
