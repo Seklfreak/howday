@@ -13,14 +13,15 @@ struct BoardState: Sendable {
 }
 
 struct BoardRepository {
-    /// Sync the address book, then build the board from mutual contacts:
-    /// RLS makes the single day-filtered checkins query return exactly the
-    /// viewer's own row plus mutual contacts' rows. "Today" is the viewer's
-    /// local day — a friend a few timezones ahead may briefly show "not yet"
-    /// around midnight.
+    /// Build the board from mutual contacts: RLS makes the single
+    /// day-filtered checkins query return exactly the viewer's own row plus
+    /// mutual contacts' rows. "Today" is the viewer's local day — a friend a
+    /// few timezones ahead may briefly show "not yet" around midnight.
+    /// Contact syncing is NOT done here (see ContactDirectory.syncIfNeeded);
+    /// this stays cheap enough to run on every realtime event.
     func load() async throws -> BoardState {
         let myId = try await Supa.client.auth.session.user.id
-        let friends = try await ContactDirectory.syncAndFetchMutuals()
+        let friends = try await ContactDirectory.fetchMutuals()
         let rows: [Checkin] = try await Supa.client
             .from("checkins")
             .select(CheckinRepository.columns)

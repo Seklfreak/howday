@@ -6,6 +6,7 @@ struct BoardView: View {
     /// Bound to the tab selection so the gate can jump to the check-in tab.
     @Binding var tabSelection: MainTab
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var board = BoardState()
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -25,11 +26,16 @@ struct BoardView: View {
                 }
             }
             .navigationTitle("Friends today")
-            .task {
-                await load()
-                await listenForChanges()
-            }
+            .task { await listenForChanges() }
             .refreshable { await load() }
+            .onChange(of: scenePhase) {
+                // Coming back to the foreground: the socket may have dropped
+                // and missed events are never replayed — refetch. This is
+                // also what makes a notification tap land on fresh data.
+                if scenePhase == .active {
+                    Task { await load() }
+                }
+            }
         }
     }
 
@@ -86,6 +92,9 @@ struct BoardView: View {
         await ContactDirectory.requestAccess()
         contactsDenied = !ContactDirectory.isAuthorized
         if !contactsDenied {
+            // No-op unless the app was foregrounded or contacts changed
+            // since the last upload.
+            await ContactDirectory.syncIfNeeded()
             do {
                 board = try await BoardRepository().load()
                 errorMessage = nil
@@ -113,6 +122,10 @@ struct BoardView: View {
         let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "checkins")
         await channel.subscribe()
         defer { Task { await Supa.client.removeChannel(channel) } }
+        // Initial load AFTER subscribing: there is no realtime catch-up, so
+        // a check-in landing mid-load would otherwise stay invisible until
+        // the next manual refresh.
+        await load()
         for await _ in changes {
             await load()
         }

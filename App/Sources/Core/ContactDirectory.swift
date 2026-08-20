@@ -1,6 +1,7 @@
 import Contacts
 import Foundation
 import Supabase
+import UIKit
 
 /// The viewer's local address book, powering the contacts-based social
 /// graph: phone-number hashes are synced to the server to derive mutual
@@ -42,19 +43,71 @@ enum ContactDirectory {
         return granted ?? false
     }
 
+    /// Serializes the cached address-book index and the sync-staleness flag.
+    private actor State {
+        private(set) var index: [String: Identity]?
+        private(set) var needsSync = true
+
+        func setIndex(_ new: [String: Identity]) { index = new }
+        func clearNeedsSync() { needsSync = false }
+        func markDirty(dropIndex: Bool) {
+            needsSync = true
+            if dropIndex { index = nil }
+        }
+    }
+
+    private static let state = State()
+
+    /// Staleness hooks, installed on first use: returning to the foreground
+    /// re-syncs (the cheap way to keep links fresh for friends), and an
+    /// address-book edit additionally drops the cached name/photo index.
+    private static let observers: [NSObjectProtocol] = [
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil
+        ) { _ in
+            Task {
+                await state.markDirty(dropIndex: false)
+                await syncIfNeeded()
+            }
+        },
+        NotificationCenter.default.addObserver(
+            forName: .CNContactStoreDidChange, object: nil, queue: nil
+        ) { _ in
+            Task {
+                await state.markDirty(dropIndex: true)
+                await syncIfNeeded()
+            }
+        },
+    ]
+
     /// Replace the server's view of who this user knows with the current
-    /// address book (hashes only), then return the mutual contacts with
-    /// their locally-resolved identities.
-    static func syncAndFetchMutuals() async throws -> [(id: UUID, identity: Identity)] {
+    /// address book (hashes only) — at most once per foreground session or
+    /// contacts change, so it's cheap to call from every board load. On
+    /// failure the staleness flag stays set and the next call retries.
+    static func syncIfNeeded() async {
+        _ = observers
+        guard isAuthorized,
+              (try? await Supa.client.auth.session) != nil,
+              await state.needsSync else { return }
+        do {
+            let index = try await currentIndex()
+            struct SyncResult: Decodable { let linked: Int }
+            let _: SyncResult = try await Supa.client.functions.invoke(
+                "sync-contacts",
+                options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
+            )
+            await state.clearNeedsSync()
+        } catch {
+            // Stale links only mean stale visibility; the retry is free.
+        }
+    }
+
+    /// The caller's mutual contacts with locally-resolved identities. Does
+    /// NOT sync — two cheap calls (cached index + one RPC), safe to run on
+    /// every board refresh and realtime event.
+    static func fetchMutuals() async throws -> [(id: UUID, identity: Identity)] {
         guard isAuthorized else { throw DirectoryError.accessDenied }
-        let index = try await localIndex()
-
-        struct SyncResult: Decodable { let linked: Int }
-        let _: SyncResult = try await Supa.client.functions.invoke(
-            "sync-contacts",
-            options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
-        )
-
+        let index = try await currentIndex()
         let mutuals: [MutualRow] = try await Supa.client
             .rpc("my_mutuals")
             .execute()
@@ -62,6 +115,14 @@ enum ContactDirectory {
         return mutuals.map {
             ($0.id, index[$0.phoneHash] ?? Identity(name: "Friend", photo: nil))
         }
+    }
+
+    /// The address-book index, rebuilt only after a contacts change.
+    private static func currentIndex() async throws -> [String: Identity] {
+        if let cached = await state.index { return cached }
+        let built = try await localIndex()
+        await state.setIndex(built)
+        return built
     }
 
     enum DirectoryError: LocalizedError {
