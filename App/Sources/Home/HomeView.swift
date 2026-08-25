@@ -141,13 +141,13 @@ struct HomeView: View {
         do {
             let userId = try await Supa.client.auth.session.user.id
             wildcard = MoodEmoji.wildcard(for: userId, day: LocalDay.string())
-            confirmed = try await CheckinRepository().today()?.emoji
+            confirmed = try await withSkewRetry { try await CheckinRepository().today() }?.emoji
             selected = confirmed
         } catch {
             // Backgrounding can cancel the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
             guard !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.report("home.load")
         }
         isLoading = false
     }
@@ -165,14 +165,14 @@ struct HomeView: View {
         saveTask = Task {
             await previous?.value
             do {
-                try await CheckinRepository().saveToday(emoji: choice)
+                try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
                 confirmed = choice
             } catch {
                 // A later tap that lands supersedes this failure; only roll
                 // back if this is still what the user is looking at.
                 if selected == choice {
                     withAnimation { selected = confirmed }
-                    errorMessage = error.localizedDescription
+                    errorMessage = error.report("home.save")
                 }
             }
         }

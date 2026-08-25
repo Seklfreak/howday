@@ -121,13 +121,13 @@ struct HistoryView: View {
         do {
             let first = LocalDay.string(for: monthStart)
             let last = LocalDay.string(for: date(day: daysInMonth))
-            let rows = try await CheckinRepository().mine(from: first, to: last)
+            let rows = try await withSkewRetry { try await CheckinRepository().mine(from: first, to: last) }
             checkinsByDay = Dictionary(uniqueKeysWithValues: rows.map { ($0.day, $0) })
         } catch {
             // Leaving the tab cancels the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
             guard !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.report("history.load")
         }
     }
 }

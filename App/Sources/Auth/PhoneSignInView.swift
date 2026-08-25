@@ -85,7 +85,7 @@ struct PhoneSignInView: View {
             do {
                 try await work()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.report("auth.signIn")
             }
             isBusy = false
         }

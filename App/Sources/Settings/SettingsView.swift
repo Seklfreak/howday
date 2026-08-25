@@ -102,7 +102,7 @@ struct SettingsView: View {
                 // auth state change flips the app back to sign-in.
                 try? await Supa.client.auth.signOut(scope: .local)
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.report("settings.deleteAccount")
             }
             isDeleting = false
         }

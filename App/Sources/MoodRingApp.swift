@@ -19,6 +19,10 @@ struct MoodRingApp: App {
                 // responses. Full sampling is fine at this user count —
                 // dial down before it ever dents the Sentry quota.
                 options.tracesSampleRate = 1.0
+                // Failed-request capture defaults to 5xx only; Supabase
+                // reports auth/RLS/PostgREST problems as 4xx, and those
+                // are exactly the ones worth seeing.
+                options.failedRequestStatusCodes = [HttpStatusCodeRange(min: 400, max: 599)]
             }
         }
         #endif
