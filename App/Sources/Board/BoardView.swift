@@ -177,11 +177,13 @@ private struct BoardCard: View {
             Text(entry.identity.name)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
-            if entry.checkin == nil {
-                Text("Not yet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            // Kept even when there's nothing to say: the grid sizes each
+            // card to its own content, so dropping the line made checked-in
+            // friends' cards visibly shorter than the rest.
+            Text(entry.checkin == nil ? "Not yet" : " ")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(entry.checkin != nil)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
