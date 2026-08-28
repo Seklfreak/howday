@@ -49,6 +49,12 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+            .onChange(of: showSettings) {
+                // Dismissing a sheet doesn't fire onAppear on the view beneath
+                // it, so without this the board stays "on" /settings and every
+                // action taken after closing it is filed under Settings.
+                if !showSettings { Analytics.screen(selected == nil ? .home : .board) }
+            }
             .task { await load() }
             .onAppear {
                 // The first pageview comes from load(); this one catches

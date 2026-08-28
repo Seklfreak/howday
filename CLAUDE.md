@@ -140,6 +140,10 @@ and window-geometry guessing; AXe needs neither.
   fires `onAppear` more than once on a NavigationStack root when a pushed view
   pops, which double-counted every return from History. Keep the time bound —
   suppressing *every* repeat would swallow genuine second visits.
+- Every action event is filed under the last screen `Analytics.screen` was
+  given, so anything that changes what's on screen without an `onAppear` has
+  to say so. Dismissing a sheet is the one that bites: `HomeView` reports the
+  board again when Settings closes, or taps get attributed to `/settings`.
 - Adding `payload.id` made the app touch `UserDefaults`, a required-reason API,
   so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
   `sources` in `project.yml` — it must land at the `.app` root.
