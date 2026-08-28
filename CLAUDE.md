@@ -136,6 +136,10 @@ and window-geometry guessing; AXe needs neither.
   Debug only**, so the `#if !DEBUG` block is not built by `test.yaml`; a
   Release build (`-configuration Release CODE_SIGNING_ALLOWED=NO`) is the only
   local check that covers it.
+- `Analytics.screen` drops a screen that repeats within 2 seconds: SwiftUI
+  fires `onAppear` more than once on a NavigationStack root when a pushed view
+  pops, which double-counted every return from History. Keep the time bound —
+  suppressing *every* repeat would swallow genuine second visits.
 - Adding `payload.id` made the app touch `UserDefaults`, a required-reason API,
   so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
   `sources` in `project.yml` — it must land at the `.app` root.

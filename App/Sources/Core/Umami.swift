@@ -48,6 +48,11 @@ enum Analytics {
     private static var userAgent = ""
     private static var currentPath = "/"
     private static var currentTitle = ""
+    /// SwiftUI calls `onAppear` more than once on a NavigationStack root when
+    /// a pushed view pops — returning from History counted the board twice.
+    /// A screen repeating within this window is that bounce, not a visit.
+    private static let repeatWindow: TimeInterval = 2
+    private static var lastScreenAt: Date?
     private static var pending: [[String: Any]] = []
     private static var isSending = false
     private static var cachedScreenSize: String?
@@ -82,8 +87,15 @@ enum Analytics {
 
     /// A pageview. Also fixes the path that subsequent `track` calls carry.
     static func screen(_ screen: Screen) {
-        currentPath = "/\(screen.rawValue)"
+        let path = "/\(screen.rawValue)"
+        // Deliberately not "same as last" alone: a genuine second visit to the
+        // screen you were just on is still worth counting, minutes later.
+        if path == currentPath, let lastScreenAt, Date().timeIntervalSince(lastScreenAt) < repeatWindow {
+            return
+        }
+        currentPath = path
         currentTitle = screen.title
+        lastScreenAt = Date()
         queue(name: nil, data: [:])
     }
 
