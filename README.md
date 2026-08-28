@@ -79,9 +79,11 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   matching must hash the identical form (`PhoneNumber.hashForMatching`).
 - **`checkins.day`** is the user's *local* date, computed client-side; the
   `unique (user_id, day)` constraint enforces one check-in per day.
-- **Friend-check-in pushes** notify only *mutual* contacts, only on the first
-  check-in of the day (the trigger is INSERT-only; emoji edits are updates),
-  and the alert text is generic — the server stores no names to put in it.
+- **Friend-check-in pushes** notify only *mutual* contacts, and the alert text
+  is generic — the server stores no names to put in it. Changing today's mood
+  notifies too, but pushes are rate limited to one per author per 30 minutes
+  so that re-tapping emoji can't spam anyone; a new day's check-in always
+  goes out regardless of the cooldown.
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
 - Privacy lives in RLS, not in the app: your check-ins are readable only by

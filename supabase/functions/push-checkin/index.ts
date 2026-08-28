@@ -1,9 +1,17 @@
 // Sends "a friend just checked in" APNs pushes to a check-in author's mutual
-// contacts. Invoked by the on_checkin_insert_push DB trigger via pg_net, not
-// by clients: verify_jwt is off (config.toml), and the x-push-secret header
+// contacts. Invoked by the on_checkin_push DB trigger via pg_net, not by
+// clients: verify_jwt is off (config.toml), and the x-push-secret header
 // (PUSH_FN_SECRET, mirrored in Vault for the trigger) is the only gate.
 // The server stores no names, so the alert text is deliberately generic.
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+// The trigger fires for a new check-in and for a mood changed later the same
+// day; only the wording differs. Unknown values fall back to the new-check-in
+// body rather than dropping the push.
+const ALERT_BODY = {
+  new: "A friend just checked in 💫",
+  update: "A friend changed their mood 💫",
+} as const;
 
 const APNS_HOST = {
   production: "https://api.push.apple.com",
@@ -69,14 +77,16 @@ Deno.serve(async (req) => {
   }
 
   let userId: unknown;
+  let kind: unknown;
   try {
-    ({ user_id: userId } = await req.json());
+    ({ user_id: userId, kind } = await req.json());
   } catch {
     return json({ error: "invalid JSON body" }, 400);
   }
   if (typeof userId !== "string") {
     return json({ error: "user_id required" }, 400);
   }
+  const alertBody = kind === "update" ? ALERT_BODY.update : ALERT_BODY.new;
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -109,7 +119,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             aps: {
-              alert: { body: "A friend just checked in 💫" },
+              alert: { body: alertBody },
               sound: "default",
               "thread-id": "friend-checkins",
             },

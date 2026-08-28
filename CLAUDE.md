@@ -103,6 +103,12 @@ and window-geometry guessing; AXe needs neither.
   **Vault** (repo is public — no project ref in migrations) and silently
   no-ops if they're absent; the `push-checkin` Edge Function has
   `verify_jwt = false` and is gated only by the `x-push-secret` header.
+- The trigger fires on insert **and** on an emoji change to a recent day, so
+  edits notify too. Edits are rate limited per author (30 min) via the sealed
+  `checkin_push_log` table, claimed atomically in the same
+  `insert … on conflict … where` that records it. Inserts bypass the cooldown
+  on purpose — there's at most one per user per day, and the daily alert must
+  not be swallowed by an edit made just before midnight.
 - APNs tokens are **environment-specific**: the `aps-environment` entitlement
   comes from the `APS_ENVIRONMENT` build setting (Debug = development,
   Release = production), and `PushRegistrar`'s `#if DEBUG` sandbox flag must
