@@ -19,12 +19,35 @@ extension Error {
         localizedDescription.localizedCaseInsensitiveContains("issued at future")
     }
 
+    /// The device couldn't reach the network — backgrounded mid-request, no
+    /// signal, DNS or the connection dropped. Worth showing the user (the load
+    /// really did fail) but never worth a Sentry issue: there is no defect to
+    /// find, and one issue per blip is how a project fills with noise. The
+    /// board load is the usual source, cut off with ECONNRESET when the app
+    /// goes to the background mid-request.
+    var isTransientNetwork: Bool {
+        let nsError = self as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        return [
+            NSURLErrorTimedOut,
+            NSURLErrorCannotFindHost,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorDNSLookupFailed,
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorInternationalRoamingOff,
+            NSURLErrorCallIsActive,
+            NSURLErrorDataNotAllowed,
+        ].contains(nsError.code)
+    }
+
     /// Sends the error to Sentry (no-op in Debug, where the SDK isn't
-    /// started) and returns the text to show the user. Cancellations are
-    /// never reported — callers should already have filtered them out.
+    /// started) and returns the text to show the user. Cancellations and
+    /// transient network failures are never reported, but their text is still
+    /// returned: what the user sees and what Sentry keeps are separate calls.
     @discardableResult
     func report(_ flow: String) -> String {
-        if !isCancellation {
+        if !isCancellation && !isTransientNetwork {
             SentrySDK.capture(error: self) { scope in
                 scope.setTag(value: flow, key: "flow")
             }
