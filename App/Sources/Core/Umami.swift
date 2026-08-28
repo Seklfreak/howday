@@ -18,6 +18,7 @@ enum Analytics {
     enum Screen: String {
         case signIn = "sign-in"
         case onboarding
+        case notifications = "onboarding-notifications"
         case home
         case board
         case history
@@ -28,6 +29,7 @@ enum Analytics {
             switch self {
             case .signIn: "Sign in"
             case .onboarding: "Onboarding"
+            case .notifications: "Notifications"
             case .home: "Mood picker"
             case .board: "Friends board"
             case .history: "History"

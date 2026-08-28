@@ -54,11 +54,15 @@ private struct UnregisterParams: Encodable {
 enum PushRegistrar {
     private static let tokenKey = "apnsDeviceToken"
 
-    /// Ask for notification permission (shared with the daily reminder) and
-    /// request an APNs token; PushDelegate uploads whatever comes back.
-    static func register() async {
-        _ = try? await UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound, .badge])
+    /// Request an APNs token if notifications are already allowed;
+    /// PushDelegate uploads whatever comes back. Deliberately never raises
+    /// the system prompt — that belongs to the onboarding screen that has
+    /// just explained what the notifications are for. Called on every launch
+    /// that reaches the signed-in UI, so permission granted later in iOS
+    /// Settings is picked up too.
+    static func registerIfAuthorized() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .authorized || status == .provisional else { return }
         await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
     }
 

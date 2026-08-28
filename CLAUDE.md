@@ -148,6 +148,29 @@ and window-geometry guessing; AXe needs neither.
   so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
   `sources` in `project.yml` — it must land at the `.app` root.
 
+## Onboarding & permissions
+
+- Sign-in takes a **country + national number**, never a typed `+code`:
+  `CountryCode` carries the ISO-region → calling-code table because iOS
+  publishes no calling-code API (names and flags are still derived from the
+  region, so they follow the device language). `PhoneNumber.e164` drops a
+  leading trunk `0` — Italy is the one country that keeps it, and only on
+  landlines, which can't receive the SMS anyway. A pasted `+…`/`00…` number
+  moves the picker instead of landing in the national field.
+- **Only onboarding (and Reminder settings) may raise the notification
+  prompt.** `PushRegistrar.registerIfAuthorized()` deliberately never asks —
+  it re-registers for APNs when permission already exists, so a rotated token
+  still gets re-uploaded on every launch. The onboarding screen asks via
+  `ReminderScheduler.sync`, so one prompt covers the daily reminder and
+  friend-check-in pushes, and it lands after the screen that explains them.
+  That screen is also what makes the daily reminder real: before it,
+  `reminderConfigured` was only ever written by a Settings visit nobody made.
+- `onboardingCompleted` (UserDefaults) is what stops onboarding reappearing
+  on every launch after a "Not now" — the contacts authorization status alone
+  can't tell a deliberate skip from a fresh install. `BoardView` still raises
+  the contacts prompt on first board load; that stays the way back in for
+  someone who skipped.
+
 ## Auth / Twilio
 
 - Twilio Verify on a **trial** account only delivers to verified caller IDs —

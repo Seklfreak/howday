@@ -47,6 +47,10 @@ struct RootView: View {
     }
 
     @State private var stage: Stage = .loading
+    /// Set once the onboarding screens have been walked through. Without it
+    /// a "Not now" on the contacts prompt leaves the system permission
+    /// undecided, and onboarding reappears on every launch.
+    @AppStorage("onboardingCompleted") private var onboardingCompleted = false
 
     var body: some View {
         Group {
@@ -56,7 +60,10 @@ struct RootView: View {
             case .signedOut:
                 PhoneSignInView()
             case .onboarding:
-                OnboardingView { stage = .ready }
+                OnboardingView {
+                    onboardingCompleted = true
+                    stage = .ready
+                }
             case .ready:
                 HomeView()
             }
@@ -67,7 +74,7 @@ struct RootView: View {
             // Every launch that reaches the signed-in UI re-registers, so a
             // rotated APNs token is re-uploaded without any bookkeeping.
             if stage == .ready {
-                Task { await PushRegistrar.register() }
+                Task { await PushRegistrar.registerIfAuthorized() }
             }
         }
         .task {
@@ -76,10 +83,10 @@ struct RootView: View {
                 if state.session == nil {
                     stage = .signedOut
                 } else {
-                    // Onboarding is just the contacts pitch — once the
-                    // permission prompt has been answered either way, there
-                    // is nothing left to set up.
-                    stage = ContactDirectory.hasBeenAsked ? .ready : .onboarding
+                    // Onboarding is the contacts and notifications pitch;
+                    // an already-answered contacts prompt means an install
+                    // from before the flag existed.
+                    stage = (onboardingCompleted || ContactDirectory.hasBeenAsked) ? .ready : .onboarding
                 }
             }
         }

@@ -46,6 +46,10 @@ struct ReminderSettingsView: View {
                             deniedPermission = !ok
                             if ok {
                                 reminderConfigured = true
+                                // Permission granted here also covers friend
+                                // check-in pushes, which onboarding may have
+                                // been declined for.
+                                await PushRegistrar.registerIfAuthorized()
                                 Analytics.track(
                                     "reminder_saved",
                                     ["enabled": String(reminderEnabled), "hour": String(reminderHour)]
