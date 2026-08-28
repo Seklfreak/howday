@@ -146,7 +146,10 @@ and window-geometry guessing; AXe needs neither.
   board again when Settings closes, or taps get attributed to `/settings`.
 - Adding `payload.id` made the app touch `UserDefaults`, a required-reason API,
   so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
-  `sources` in `project.yml` — it must land at the `.app` root.
+  `sources` in `project.yml` — it must land at the `.app` root. The reasons key is
+  `NSPrivacyAccessedAPITypeReasons`; the shorter `NSPrivacyAccessedAPIReasons`
+  passes `plutil -lint` and is rejected on upload as ITMS-91056 (see
+  TN3181).
 
 ## Onboarding & permissions
 
