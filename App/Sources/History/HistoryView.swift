@@ -29,6 +29,7 @@ struct HistoryView: View {
         }
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("History")
+        .onAppear { Analytics.screen(.history) }
         .task(id: monthKey) { await load() }
         .sheet(item: $selected) { checkin in
             CheckinDetailSheet(checkin: checkin)

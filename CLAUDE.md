@@ -115,6 +115,31 @@ and window-geometry guessing; AXe needs neither.
   match — a token sent to the wrong APNs host is just `BadDeviceToken`
   (and gets deleted by the function's dead-token cleanup).
 
+## Analytics (Umami)
+
+- `Core/Umami.swift` talks to Umami's `/api/send` directly — the same JSON the
+  web tracker posts. Two things about that endpoint bite:
+  **a request with no `User-Agent` is rejected**, and one whose UA trips
+  Umami's bot filter gets a **`200` that stores nothing**. `browserUserAgent()`
+  therefore has to keep looking like a browser; it is also where Umami reads
+  the OS and device from, so don't reduce it to `Moodring/1.0`.
+- An app has no browser session for Umami to hash into a visitor id, so every
+  event carries `payload.id` — a random UUID per install, kept in
+  `UserDefaults`. Never put the Supabase user id (or anything derived from a
+  phone number) there. Umami caps that field at 50 characters.
+- Events **never carry the mood emoji**, a name, or a hash. `checkin_saved` /
+  `checkin_edited` record that a check-in happened, not what it was; keep it
+  that way unless the decision is made deliberately.
+- Disabled in Debug (`#if !DEBUG` in `MoodRingApp`, mirroring Sentry) and
+  disabled whenever `UMAMI_URL`/`UMAMI_WEBSITE_ID` are empty — which is what CI
+  and simulator builds get from the placeholder xcconfig. **CI compile-checks
+  Debug only**, so the `#if !DEBUG` block is not built by `test.yaml`; a
+  Release build (`-configuration Release CODE_SIGNING_ALLOWED=NO`) is the only
+  local check that covers it.
+- Adding `payload.id` made the app touch `UserDefaults`, a required-reason API,
+  so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
+  `sources` in `project.yml` — it must land at the `.app` root.
+
 ## Auth / Twilio
 
 - Twilio Verify on a **trial** account only delivers to verified caller IDs —

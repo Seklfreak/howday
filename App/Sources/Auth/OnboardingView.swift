@@ -34,16 +34,26 @@ struct OnboardingView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(isBusy)
-            Button("Not now") { onDone() }
+            Button("Not now") {
+                Analytics.track("onboarding_skipped")
+                onDone()
+            }
                 .disabled(isBusy)
         }
         .padding(24)
+        .onAppear { Analytics.screen(.onboarding) }
     }
 
     private func allow() {
         isBusy = true
         Task {
+            // Only report when this call is the one that raised the prompt —
+            // requestAccess is a no-op once the user has answered.
+            let wasAsked = ContactDirectory.hasBeenAsked
             await ContactDirectory.requestAccess()
+            if !wasAsked {
+                Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
+            }
             onDone()
         }
     }

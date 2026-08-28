@@ -72,6 +72,7 @@ struct SettingsView: View {
             } message: {
                 Text("This cannot be undone.")
             }
+            .onAppear { Analytics.screen(.settings) }
             .task {
                 userId = try? await Supa.client.auth.session.user.id.uuidString
             }
@@ -98,6 +99,7 @@ struct SettingsView: View {
                 await PushRegistrar.unregister()
                 struct Result: Decodable { let deleted: Bool }
                 let _: Result = try await Supa.client.functions.invoke("delete-account")
+                Analytics.track("account_deleted")
                 // Server-side account is gone; drop the local session. The
                 // auth state change flips the app back to sign-in.
                 try? await Supa.client.auth.signOut(scope: .local)

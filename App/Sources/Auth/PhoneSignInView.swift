@@ -62,12 +62,16 @@ struct PhoneSignInView: View {
             }
             .navigationTitle("Moodring")
         }
+        .onAppear { Analytics.screen(.signIn) }
     }
 
     private func sendCode() {
         guard let phone = PhoneNumber.e164(from: phoneInput) else { return }
         run {
             try await Supa.client.auth.signInWithOTP(phone: phone)
+            // Only once Twilio has actually taken it, so the pair with
+            // signin_completed measures the code step, not failed sends.
+            Analytics.track("signin_code_sent")
             step = .enterCode(phone: phone)
         }
     }
@@ -75,6 +79,7 @@ struct PhoneSignInView: View {
     private func verify(phone: String) {
         run {
             try await Supa.client.auth.verifyOTP(phone: phone, token: code, type: .sms)
+            Analytics.track("signin_completed")
         }
     }
 

@@ -25,6 +25,9 @@ struct MoodRingApp: App {
                 options.failedRequestStatusCodes = [HttpStatusCodeRange(min: 400, max: 599)]
             }
         }
+        // Same rule as Sentry: local runs would only muddy the numbers, and
+        // the placeholder xcconfig has no Umami credentials anyway.
+        Analytics.configure()
         #endif
     }
 

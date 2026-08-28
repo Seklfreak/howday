@@ -14,7 +14,8 @@ redistribution.
 
 - `project.yml` — XcodeGen definition; the `.xcodeproj` is generated, not committed
 - `App/Sources/` — SwiftUI app, one folder per feature (Auth, CheckIn, Board, History, Core)
-- `Config/Secrets.xcconfig` — Supabase URL + anon key (gitignored; copy from `Secrets.example.xcconfig`)
+- `Config/Secrets.xcconfig` — Supabase URL + anon key, Sentry DSN, Umami host (gitignored; copy from `Secrets.example.xcconfig`)
+- `App/PrivacyInfo.xcprivacy` — privacy manifest: what the app collects and why it touches `UserDefaults`
 - `supabase/migrations/` — schema + RLS, applied with the Supabase CLI
 - `supabase/functions/sync-contacts/` — Edge Function that turns hashed contact uploads into `contact_links`
 
@@ -58,6 +59,12 @@ redistribution.
       select vault.create_secret('https://<PROJECT_REF>.supabase.co', 'project_url');
       select vault.create_secret('<the same PUSH_FN_SECRET value>', 'push_fn_secret');
       ```
+6. **Analytics** (optional) — add a website in a self-hosted
+   [Umami](https://umami.is) instance with any domain that marks it as the app
+   (e.g. `moodring.ios`, which is the `hostname` `Analytics` sends), then put
+   the instance URL and the website id in `Config/Secrets.xcconfig` as
+   `UMAMI_URL` / `UMAMI_WEBSITE_ID`. Leaving either empty disables analytics;
+   Debug builds never send regardless.
 
 ## Build & run
 
@@ -84,6 +91,12 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   notifies too, but pushes are rate limited to one per author per 30 minutes
   so that re-tapping emoji can't spam anyone; a new day's check-in always
   goes out regardless of the cooldown.
+- **Analytics collect nothing personal**: `Core/Umami.swift` posts screen
+  views and a short list of actions straight to a self-hosted Umami instance —
+  no SDK and no third party in the path. The visitor id is a random UUID per
+  install (gone when the app is deleted), never the Supabase user id, and the
+  check-in events deliberately carry no emoji: the mood is the private part.
+  No IDFA, so no App Tracking Transparency prompt.
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
 - Privacy lives in RLS, not in the app: your check-ins are readable only by

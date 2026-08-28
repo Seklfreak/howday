@@ -21,6 +21,7 @@ targets:
     sources:
       - App/Sources
       - App/Assets.xcassets
+      - App/PrivacyInfo.xcprivacy
     dependencies:
       - package: Supabase
         product: Supabase
@@ -73,6 +74,8 @@ targets:
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
         SENTRY_DSN: $(SENTRY_DSN)
+        UMAMI_URL: $(UMAMI_URL)
+        UMAMI_WEBSITE_ID: $(UMAMI_WEBSITE_ID)
         NSContactsUsageDescription: >-
           Moodring is contacts-based: friends are matched by hashed phone
           numbers, and their names and photos are shown straight from your

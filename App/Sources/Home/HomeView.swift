@@ -50,6 +50,11 @@ struct HomeView: View {
                 SettingsView()
             }
             .task { await load() }
+            .onAppear {
+                // The first pageview comes from load(); this one catches
+                // coming back from History, which leaves this view mounted.
+                if !isLoading { Analytics.screen(selected == nil ? .home : .board) }
+            }
         }
         .tint(currentTheme.accent)
     }
@@ -150,6 +155,9 @@ struct HomeView: View {
             errorMessage = error.report("home.load")
         }
         isLoading = false
+        // The picker and the board are the same view in its two states, so
+        // which one the load lands on is the pageview worth recording.
+        Analytics.screen(selected == nil ? .home : .board)
     }
 
     /// Tapping an emoji IS the check-in — no separate confirm step, and no
@@ -158,8 +166,14 @@ struct HomeView: View {
     /// in the order they were made and the last tap is the one that sticks.
     private func lockIn(_ choice: String) {
         guard choice != selected else { return }
+        // Read from `selected`, not `confirmed`: it moves with the tap, so
+        // rapid taps before the first save lands can't both count as first.
+        let isFirstToday = selected == nil
         withAnimation { selected = choice }
         errorMessage = nil
+        // The board takes over the moment the first mood lands, not when the
+        // save comes back — record the screen the user is actually looking at.
+        if isFirstToday { Analytics.screen(.board) }
 
         let previous = saveTask
         saveTask = Task {
@@ -167,6 +181,8 @@ struct HomeView: View {
             do {
                 try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
                 confirmed = choice
+                // The emoji stays out of it — the mood is the private part.
+                Analytics.track(isFirstToday ? "checkin_saved" : "checkin_edited")
             } catch {
                 // A later tap that lands supersedes this failure; only roll
                 // back if this is still what the user is looking at.

@@ -46,12 +46,17 @@ struct ReminderSettingsView: View {
                             deniedPermission = !ok
                             if ok {
                                 reminderConfigured = true
+                                Analytics.track(
+                                    "reminder_saved",
+                                    ["enabled": String(reminderEnabled), "hour": String(reminderHour)]
+                                )
                                 dismiss()
                             }
                         }
                     }
                 }
             }
+            .onAppear { Analytics.screen(.reminder) }
             .navigationTitle("Reminder")
             .navigationBarTitleDisplayMode(.inline)
         }

@@ -74,8 +74,14 @@ struct BoardView: View {
     private func load() async {
         // First board visit triggers the contacts prompt; afterwards this is
         // a no-op and isAuthorized reflects the user's answer.
+        let wasAsked = ContactDirectory.hasBeenAsked
         await ContactDirectory.requestAccess()
         contactsDenied = !ContactDirectory.isAuthorized
+        // Reported here as well as in onboarding: whichever call actually
+        // raises the prompt is the one that sees the answer.
+        if !wasAsked {
+            Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
+        }
         if !contactsDenied {
             // No-op unless the app was foregrounded or contacts changed
             // since the last upload.
@@ -133,6 +139,7 @@ private struct BoardCard: View {
     var body: some View {
         if let messageURL {
             Button {
+                Analytics.track("friend_tapped")
                 UIApplication.shared.open(messageURL)
             } label: {
                 card
