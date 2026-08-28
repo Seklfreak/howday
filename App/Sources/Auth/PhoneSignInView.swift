@@ -108,7 +108,7 @@ struct PhoneSignInView: View {
                     .onChange(of: national) { _, new in adoptPastedCountry(from: new) }
             }
 
-            Text("No country code needed — we start from your region. We text you a 6-digit code; there's no password.")
+            Text("We text you a 6-digit code; there's no password.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
