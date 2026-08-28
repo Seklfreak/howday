@@ -33,7 +33,7 @@ struct ReminderSettingsView: View {
                 }
                 if deniedPermission {
                     Section {
-                        Text("Notifications are turned off for Moodring. Enable them in Settings to get the reminder.")
+                        Text("Notifications are turned off for Howday. Enable them in Settings to get the reminder.")
                             .foregroundStyle(.red)
                     }
                 }

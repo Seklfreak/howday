@@ -41,6 +41,9 @@ enum Analytics {
 
     /// The domain the site is registered under in Umami. Not a real host — it
     /// just keeps app traffic apart from the websites on the same instance.
+    /// Still the pre-rename name: it identifies the site registered in
+    /// Umami (declared in winkcloud), and changing it here would only split
+    /// the history in two.
     private static let hostname = "moodring.ios"
     /// A long offline stretch drops the oldest events rather than growing.
     private static let queueLimit = 50
@@ -161,7 +164,7 @@ enum Analytics {
         let os = UIDevice.current.systemVersion.replacingOccurrences(of: ".", with: "_")
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         return "Mozilla/5.0 (iPhone; CPU iPhone OS \(os) like Mac OS X) "
-            + "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Moodring/\(version)"
+            + "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Howday/\(version)"
     }
 
     /// Points, mirroring the CSS pixels the web tracker reports. Read lazily:

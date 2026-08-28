@@ -3,7 +3,7 @@ import Supabase
 import SwiftUI
 
 @main
-struct MoodRingApp: App {
+struct HowdayApp: App {
     @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
 
     init() {

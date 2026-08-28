@@ -69,7 +69,7 @@ struct PhoneSignInView: View {
 
     private var header: some View {
         VStack(spacing: 10) {
-            Text("Moodring")
+            Text("Howday")
                 .font(.largeTitle.weight(.semibold))
             Text("One emoji a day, shared with the friends who already have you in their contacts.")
                 .font(.subheadline)

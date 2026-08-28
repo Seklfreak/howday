@@ -62,6 +62,6 @@ jobs:
             | python3 -c "import sys,json; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for r in d.values() for x in r if 'iPhone' in x['name']))")
           echo "Using simulator $SIM"
           xcodebuild build \
-            -project MoodRing.xcodeproj -scheme MoodRing \
+            -project Howday.xcodeproj -scheme Howday \
             -destination "id=$SIM" \
             CODE_SIGNING_ALLOWED=NO

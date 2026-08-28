@@ -39,7 +39,7 @@ struct BoardView: View {
         ContentUnavailableView {
             Label("Contacts access is off", systemImage: "person.crop.circle.badge.questionmark")
         } description: {
-            Text("Moodring is contacts-based — friends appear automatically when you're in each other's contacts.")
+            Text("Howday is contacts-based — friends appear automatically when you're in each other's contacts.")
         } actions: {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {

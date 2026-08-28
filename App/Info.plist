@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Moodring</string>
+	<string>Howday</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSContactsUsageDescription</key>
-	<string>Moodring is contacts-based: friends are matched by hashed phone numbers, and their names and photos are shown straight from your address book. Names and photos never leave your device.</string>
+	<string>Howday is contacts-based: friends are matched by hashed phone numbers, and their names and photos are shown straight from your address book. Names and photos never leave your device.</string>
 	<key>SENTRY_DSN</key>
 	<string>$(SENTRY_DSN)</string>
 	<key>SUPABASE_ANON_KEY</key>

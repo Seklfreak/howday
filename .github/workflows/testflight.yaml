@@ -134,10 +134,10 @@ jobs:
           # switches Sentry or analytics off in the shipped app — the
           # placeholder xcconfig is never what reaches an archive.
           xcodebuild archive \
-            -project MoodRing.xcodeproj -scheme MoodRing \
+            -project Howday.xcodeproj -scheme Howday \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/MoodRing.xcarchive \
+            -archivePath build/Howday.xcarchive \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD" \
@@ -162,7 +162,7 @@ jobs:
           brew install getsentry/tools/sentry-cli
           sentry-cli debug-files upload \
             --org winktech --project moodring-ios \
-            build/MoodRing.xcarchive/dSYMs || echo "::warning::Sentry dSYM upload failed"
+            build/Howday.xcarchive/dSYMs || echo "::warning::Sentry dSYM upload failed"
 
       - name: Export + upload to TestFlight
         if: steps.gate.outputs.ready == 'true'
@@ -189,7 +189,7 @@ jobs:
           </plist>
           PLIST
           xcodebuild -exportArchive \
-            -archivePath build/MoodRing.xcarchive \
+            -archivePath build/Howday.xcarchive \
             -exportOptionsPlist build/ExportOptions.plist \
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_"$KEY_ID".p8 \
             -authenticationKeyID "$KEY_ID" \

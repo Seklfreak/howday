@@ -3,7 +3,7 @@ name: Release
 # Auto-cut a release on every green commit to main (Test must pass first).
 # The bump decision, release notes, tagging and build dispatch all live in
 # Seklfreak/ai-release-action — this file supplies only what is specific to
-# moodring.
+# howday.
 #
 # project-description is what the classifier judges "can this change reach a
 # user?" against, so it must describe THIS project.
@@ -34,7 +34,7 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           build-workflow: "testflight.yaml"
           project-description: >-
-            Moodring is an iOS app (SwiftUI, whole repo) shipped to TestFlight
+            Howday is an iOS app (SwiftUI, whole repo) shipped to TestFlight
             on every version tag: a daily mood check-in shared with friends.
             Changes under App/ and supabase/ reach users — supabase/ holds the
             backend schema and Edge Functions the shipped app talks to. Only

@@ -1,4 +1,4 @@
-# Moodring
+# Howday
 
 One mood check-in a day; see how your friends are doing. You can't see your
 friends' moods until you've shared yours. Friends are contacts-based — no
@@ -70,12 +70,12 @@ redistribution.
 
 ```sh
 xcodegen generate   # after cloning or editing project.yml
-open MoodRing.xcodeproj
+open Howday.xcodeproj
 ```
 
 Or from the CLI:
 ```sh
-xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
+xcodebuild -project Howday.xcodeproj -scheme Howday \
   -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
@@ -104,7 +104,7 @@ xcodebuild -project MoodRing.xcodeproj -scheme MoodRing \
   A one-way link (someone merely has your number) grants nothing. Names and
   photos are never uploaded; each viewer renders friends from their own
   address book. `scripts/rls-proof.sh` asserts every policy boundary against
-  a live project — it needs `MOODRING_URL`, `MOODRING_KEY`,
+  a live project — it needs `HOWDAY_URL`, `HOWDAY_KEY`,
   `TEST_PHONE_A/B`, and `TEST_OTP` in the environment (configure test
   numbers under Authentication → Phone → Test OTPs).
 

@@ -152,7 +152,7 @@ enum ContactDirectory {
     enum DirectoryError: LocalizedError {
         case accessDenied
         var errorDescription: String? {
-            "Moodring is contacts-based — enable contacts access in Settings to see your friends."
+            "Howday is contacts-based — enable contacts access in Settings to see your friends."
         }
     }
 

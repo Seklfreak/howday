@@ -1,21 +1,21 @@
 #!/bin/zsh
-# Two-account RLS proof for Moodring's contacts-based model: exercises the
+# Two-account RLS proof for Howday's contacts-based model: exercises the
 # sync → mutual → unsync lifecycle against a live project and asserts every
 # policy boundary. The critical property: a ONE-WAY contact link must grant
 # nothing — visibility requires the link in both directions.
 #
 # Required environment:
-#   MOODRING_URL     — project URL, e.g. https://<ref>.supabase.co
-#   MOODRING_KEY     — publishable (anon) API key
+#   HOWDAY_URL     — project URL, e.g. https://<ref>.supabase.co
+#   HOWDAY_KEY     — publishable (anon) API key
 #   TEST_PHONE_A     — first test phone number, digits only (e.g. 15005550001)
 #   TEST_PHONE_B     — second test phone number, digits only
 #   TEST_OTP         — the fixed OTP configured for both test numbers
 #     (Supabase dashboard: Authentication -> Phone -> Test OTPs)
-for v in MOODRING_URL MOODRING_KEY TEST_PHONE_A TEST_PHONE_B TEST_OTP; do
+for v in HOWDAY_URL HOWDAY_KEY TEST_PHONE_A TEST_PHONE_B TEST_OTP; do
   [[ -n "${(P)v}" ]] || { echo "missing env: $v"; exit 2 }
 done
-URL=$MOODRING_URL
-KEY=$MOODRING_KEY
+URL=$HOWDAY_URL
+KEY=$HOWDAY_KEY
 PASS=0; FAIL=0
 check() { # $1 label, $2 actual, $3 expected-substring-or-exact
   if [[ "$2" == *"$3"* ]]; then echo "PASS: $1"; ((PASS++));
