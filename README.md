@@ -61,7 +61,7 @@ redistribution.
       ```
 6. **Analytics** (optional) — add a website in a self-hosted
    [Umami](https://umami.is) instance with any domain that marks it as the app
-   (e.g. `moodring.ios`, which is the `hostname` `Analytics` sends), then put
+   (e.g. `howday.ios`, which is the `hostname` `Analytics` sends), then put
    the instance URL and the website id in `Config/Secrets.xcconfig` as
    `UMAMI_URL` / `UMAMI_WEBSITE_ID`. Leaving either empty disables analytics;
    Debug builds never send regardless.

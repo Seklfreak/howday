@@ -41,10 +41,10 @@ enum Analytics {
 
     /// The domain the site is registered under in Umami. Not a real host — it
     /// just keeps app traffic apart from the websites on the same instance.
-    /// Still the pre-rename name: it identifies the site registered in
-    /// Umami (declared in winkcloud), and changing it here would only split
-    /// the history in two.
-    private static let hostname = "moodring.ios"
+    /// Matches the domain the site is declared with in winkcloud. Renaming
+    /// it does not move any data — events are filed by website id — it only
+    /// means reports show two hostnames across the rename.
+    private static let hostname = "howday.ios"
     /// A long offline stretch drops the oldest events rather than growing.
     private static let queueLimit = 50
 
