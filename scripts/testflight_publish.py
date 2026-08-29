@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""Push a build's changelog to TestFlight as its "What to Test" notes.
+"""Give an uploaded TestFlight build its release notes and hand it to testers.
 
 After testflight.yaml uploads a build, this finds that build in App Store Connect
-(by build number) and sets its beta build localization `whatsNew` to the release
-changelog, so testers see what changed. Idempotent: it creates the localization
-if missing and updates it otherwise.
+(by build number), sets its beta build localization `whatsNew` to the release
+changelog, and adds it to the named beta groups. Notes first, distribution
+second: adding the build is what notifies testers, and they should have the
+changelog by then. Both halves are idempotent.
+
+Distribution has to happen here rather than being a group setting. A group's
+`hasAccessToAllBuilds` ("automatic distribution") is create-only — App Store
+Connect refuses it in a PATCH — so a group made without it can never be
+switched over, and every build has to be attached explicitly.
 
 Auth is the App Store Connect API key (an ES256-signed JWT). It never fails the
 release — if the build hasn't finished registering, or anything else goes wrong,
 it emits a warning and exits 0 (the upload itself already succeeded).
 
 Usage:
-  testflight_whats_new.py --bundle-id … --version … --build … --notes-file … \
-      --key-id … --issuer-id … --key-path …
+  testflight_publish.py --bundle-id … --version … --build … --notes-file … \
+      --key-id … --issuer-id … --key-path … [--groups Public,Internal]
 """
 import argparse
 import json
@@ -76,6 +82,8 @@ def main() -> None:
     ap.add_argument("--issuer-id", required=True)
     ap.add_argument("--key-path", required=True)
     ap.add_argument("--locale", default="en-US")
+    ap.add_argument("--groups", default="",
+                    help="comma-separated beta group names to distribute the build to")
     ap.add_argument("--timeout", type=int, default=1200, help="seconds to wait for processing")
     args = ap.parse_args()
 
@@ -113,8 +121,15 @@ def main() -> None:
             found = builds.get("data") or []
             if found:
                 build_id = found[0]["id"]
-                break
-            print(f"Build {label} not registered yet; waiting…")
+                state = (found[0].get("attributes") or {}).get("processingState")
+                # A build still processing can't be handed to a group, so wait
+                # for it when there's distribution to do.
+                if state == "VALID" or not args.groups:
+                    break
+                print(f"Build {label} is {state}; waiting for processing…")
+                build_id = None
+            else:
+                print(f"Build {label} not registered yet; waiting…")
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
                 warn_exit(f"not authorized to read builds ({e.code}); check the API key role.")
@@ -143,6 +158,43 @@ def main() -> None:
         warn_exit(f"setting What-to-Test failed ({e.code}): {e.read().decode(errors='replace')}")
 
     print(f"Set What-to-Test for build {label} ({len(notes)} chars).")
+    distribute(app_id, build_id, label, args.groups, tok)
+
+
+def distribute(app_id: str, build_id: str, label: str, group_names: str, tok: str) -> None:
+    """Add the build to each named beta group — this is what releases it to testers.
+
+    External groups only: an internal group has every build by definition, and
+    App Store Connect answers 422 for one.
+    """
+    wanted = [n.strip().casefold() for n in group_names.split(",") if n.strip()]
+    if not wanted:
+        return
+    try:
+        groups = api("GET", f"{API}/v1/apps/{app_id}/betaGroups?limit=200", tok)
+    except urllib.error.HTTPError as e:
+        warn_exit(f"beta group lookup failed ({e.code}): {e.read().decode(errors='replace')}")
+
+    by_name = {(g["attributes"].get("name") or "").casefold(): g for g in (groups.get("data") or [])}
+    for name in wanted:
+        group = by_name.get(name)
+        if not group:
+            sys.stderr.write(f"::warning::TestFlight: no beta group named {name!r}; "
+                             f"build {label} not distributed to it.\n")
+            continue
+        try:
+            api("POST", f"{API}/v1/betaGroups/{group['id']}/relationships/builds", tok,
+                {"data": [{"type": "builds", "id": build_id}]})
+            print(f"Distributed build {label} to {group['attributes']['name']}.")
+        except urllib.error.HTTPError as e:
+            # Already in the group is a success, not a failure: a re-run of the
+            # job shouldn't look broken.
+            body = e.read().decode(errors="replace")
+            if e.code == 409 and "already" in body.lower():
+                print(f"Build {label} was already in {group['attributes']['name']}.")
+                continue
+            sys.stderr.write(f"::warning::TestFlight: distributing build {label} to "
+                             f"{group['attributes']['name']} failed ({e.code}): {body}\n")
 
 
 if __name__ == "__main__":

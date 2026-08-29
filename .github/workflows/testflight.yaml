@@ -195,16 +195,19 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID"
 
-      # Push this release's changelog to TestFlight as the build's "What to
-      # Test" notes. Best-effort — a failure here only warns, the build is
-      # already uploaded.
+      # Give the build its "What to Test" notes and hand it to the testers.
+      # The Public group predates TestFlight's automatic distribution and the
+      # flag is create-only, so every build is attached explicitly here. Only
+      # external groups are listed: an internal group already has every build,
+      # and App Store Connect rejects assigning one a build.
+      # Best-effort — a failure only warns, the build is already uploaded.
       - name: Set up Python
         if: steps.gate.outputs.ready == 'true'
         uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
-      - name: Push changelog to TestFlight (What to Test)
+      - name: Publish the build to TestFlight
         if: steps.gate.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -224,9 +227,10 @@ jobs:
           [ -z "$NOTES" ] && NOTES="Bug fixes and improvements."
           printf '%s' "$NOTES" > "$RUNNER_TEMP/whats_new.md"
 
-          python scripts/testflight_whats_new.py \
+          python scripts/testflight_publish.py \
             --bundle-id dev.winktech.moodring \
             --version "$VERSION" --build "$BUILD" \
             --notes-file "$RUNNER_TEMP/whats_new.md" \
+            --groups Public \
             --key-id "$KEY_ID" --issuer-id "$ISSUER_ID" \
             --key-path ~/.appstoreconnect/private_keys/AuthKey_"$KEY_ID".p8
