@@ -57,15 +57,47 @@ extension CountryCode {
         return nil
     }
 
+    /// The picker's search, best match first. A short query is tried as an
+    /// ISO code before anything else, because the code is what people type
+    /// and it is usually *not* part of the country's own name: searching
+    /// "US" by name alone lists Australia, Belarus, Mauritius and Russia —
+    /// every country spelt with a "us" except the United States.
     static func matching(searchText: String) -> [CountryCode] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return all }
         let digits = query.filter(\.isNumber)
-        return all.filter {
-            $0.name.localizedCaseInsensitiveContains(query)
-                || (!digits.isEmpty && $0.dialText.contains(digits))
-        }
+        let region = aliases[query.uppercased()] ?? query.uppercased()
+
+        return all.enumerated()
+            .compactMap { position, country -> (key: Int, country: CountryCode)? in
+                guard let rank = country.rank(for: query, region: region, digits: digits) else { return nil }
+                // `all` is sorted by name already, so folding the position
+                // into the key keeps ties alphabetical instead of leaving
+                // them to an unstable sort.
+                return (rank * all.count + position, country)
+            }
+            .sorted { $0.key < $1.key }
+            .map(\.country)
     }
+
+    /// How well this country answers a search, lower being better; nil when
+    /// it doesn't match at all.
+    private func rank(for query: String, region: String, digits: String) -> Int? {
+        if self.region == region { return 0 }
+        if name.range(of: query, options: [.caseInsensitive, .anchored]) != nil { return 1 }
+        if name.localizedCaseInsensitiveContains(query) { return 2 }
+        guard !digits.isEmpty else { return nil }
+        // A typed calling code means the country that owns it: "+1" leads
+        // with the United States, not with Anguilla for being alphabetical.
+        if dialText == "+" + digits { return CountryCode.forDial(dial)?.region == self.region ? 3 : 4 }
+        if dialText.hasPrefix("+" + digits) { return 5 }
+        if dialText.contains(digits) { return 6 }
+        return nil
+    }
+
+    /// What people type when it isn't the ISO code. "UK" is the big one —
+    /// the region is GB, and "UK" as a name search finds only Ukraine.
+    private static let aliases: [String: String] = ["UK": "GB", "USA": "US", "UAE": "AE"]
 
     /// Regions that share a calling code — the one a typed or pasted "+code"
     /// resolves to, so the flag isn't a coin flip.
