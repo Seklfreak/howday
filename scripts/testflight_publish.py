@@ -3,9 +3,9 @@
 
 After testflight.yaml uploads a build, this finds that build in App Store Connect
 (by build number), sets its beta build localization `whatsNew` to the release
-changelog, and adds it to the named beta groups. Notes first, distribution
-second: adding the build is what notifies testers, and they should have the
-changelog by then. Both halves are idempotent.
+changelog, adds it to the named beta groups, and submits it for beta review.
+Notes first, distribution second: adding the build is what notifies testers, and
+they should have the changelog by then. Every step is idempotent.
 
 Distribution has to happen here rather than being a group setting. A group's
 `hasAccessToAllBuilds` ("automatic distribution") is create-only — App Store
@@ -176,6 +176,7 @@ def distribute(app_id: str, build_id: str, label: str, group_names: str, tok: st
         warn_exit(f"beta group lookup failed ({e.code}): {e.read().decode(errors='replace')}")
 
     by_name = {(g["attributes"].get("name") or "").casefold(): g for g in (groups.get("data") or [])}
+    attached = False
     for name in wanted:
         group = by_name.get(name)
         if not group:
@@ -185,16 +186,42 @@ def distribute(app_id: str, build_id: str, label: str, group_names: str, tok: st
         try:
             api("POST", f"{API}/v1/betaGroups/{group['id']}/relationships/builds", tok,
                 {"data": [{"type": "builds", "id": build_id}]})
+            attached = True
             print(f"Distributed build {label} to {group['attributes']['name']}.")
         except urllib.error.HTTPError as e:
             # Already in the group is a success, not a failure: a re-run of the
             # job shouldn't look broken.
             body = e.read().decode(errors="replace")
             if e.code == 409 and "already" in body.lower():
+                attached = True
                 print(f"Build {label} was already in {group['attributes']['name']}.")
                 continue
             sys.stderr.write(f"::warning::TestFlight: distributing build {label} to "
                              f"{group['attributes']['name']} failed ({e.code}): {body}\n")
+    if attached:
+        submit_for_review(build_id, label, tok)
+
+
+def submit_for_review(build_id: str, label: str, tok: str) -> None:
+    """Ask for beta review, which is what actually opens the build to testers.
+
+    A build sits at "Ready to Submit" until this exists — being in an external
+    group is not a submission. Builds after the first of an approved version
+    are usually waved through, but they still have to be asked for.
+    """
+    try:
+        current = api("GET", f"{API}/v1/builds/{build_id}/betaAppReviewSubmission", tok)
+        if current.get("data"):
+            state = current["data"]["attributes"].get("betaReviewState")
+            print(f"Build {label} is already submitted for beta review ({state}).")
+            return
+        api("POST", f"{API}/v1/betaAppReviewSubmissions", tok,
+            {"data": {"type": "betaAppReviewSubmissions",
+                      "relationships": {"build": {"data": {"type": "builds", "id": build_id}}}}})
+        print(f"Submitted build {label} for beta review.")
+    except urllib.error.HTTPError as e:
+        sys.stderr.write(f"::warning::TestFlight: submitting build {label} for beta review "
+                         f"failed ({e.code}): {e.read().decode(errors='replace')}\n")
 
 
 if __name__ == "__main__":
