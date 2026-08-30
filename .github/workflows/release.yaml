@@ -22,13 +22,37 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      # Releasing a commit that main has already moved past is pointless — the
+      # newer commit's own run covers this one, since the notes span everything
+      # back to the last tag. It also fails outright when the newer commit
+      # touched a workflow file: the tag would carry the older
+      # .github/workflows to a ref whose default branch has the newer one, and
+      # GitHub refuses that from an Actions token ("refusing to allow a GitHub
+      # App to create or update workflow ... without `workflows` permission").
+      - name: Skip a superseded commit
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          TIP="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$TIP" = "$HEAD_SHA" ]; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main is at ${TIP:0:7}, past ${HEAD_SHA:0:7}; leaving the release to that commit's run."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v7
+        if: steps.tip.outputs.stale == 'false'
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0 # the bump is read from the commit range
           fetch-tags: true # the previous tag is the baseline
 
       - uses: Seklfreak/ai-release-action@v1
+        if: steps.tip.outputs.stale == 'false'
         with:
           sha: ${{ github.event.workflow_run.head_sha }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
