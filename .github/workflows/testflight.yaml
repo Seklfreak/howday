@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Marketing version, e.g. 1.0.1. Blank = derive from the tag."
+        description: "Release version, e.g. 1.0.1 (the app ships as 1.0). Blank = derive from the tag."
         required: false
         default: ""
 
@@ -120,11 +120,17 @@ jobs:
           UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          # Marketing version: dispatch input wins, else derive from the tag (vX.Y.Z -> X.Y.Z).
+          # Release version: dispatch input wins, else derive from the tag (vX.Y.Z -> X.Y.Z).
           VERSION="$INPUT_VERSION"
           [ -z "$VERSION" ] && VERSION="${GITHUB_REF_NAME#v}"
+          # The app's marketing version is only major.minor. TestFlight runs a
+          # real Beta App Review for the first build of each new marketing
+          # version and waves later builds through, so patch releases — the
+          # common case — reuse the approved version and reach testers without
+          # another review. The build number still identifies the release.
+          MARKETING="$(echo "$VERSION" | cut -d. -f1-2)"
           BUILD="${GITHUB_RUN_NUMBER}"      # monotonic, unique per upload
-          echo "Archiving $VERSION (build $BUILD) with profile '$PROFILE_NAME'"
+          echo "Archiving $MARKETING (build $BUILD, release $VERSION) with profile '$PROFILE_NAME'"
           # Manual-signing settings live in project.yml scoped to the app
           # target (CLI settings would hit SPM package targets, which refuse
           # provisioning profiles). SUPABASE_* on the command line override
@@ -139,7 +145,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/Howday.xcarchive \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            MARKETING_VERSION="$VERSION" \
+            MARKETING_VERSION="$MARKETING" \
             CURRENT_PROJECT_VERSION="$BUILD" \
             SUPABASE_URL="$SUPABASE_URL" \
             SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \

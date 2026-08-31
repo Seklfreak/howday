@@ -195,8 +195,10 @@ and window-geometry guessing; AXe needs neither.
   PKCS#12 encryption. `security import` exits 0 but yields "0 valid
   identities" for key-only or PBES2/AES p12s — always verify with
   `security find-identity` after changing the secret.
-- Build number = CI run number; marketing version = the tag. TestFlight
-  requires strictly increasing build numbers within a version.
+- Build number = CI run number; marketing version = the tag's major.minor
+  (patch releases reuse the approved TestFlight version, so only minor/major
+  bumps trigger a real Beta App Review). TestFlight requires strictly
+  increasing build numbers within a version.
 
 ## Public repo
 
