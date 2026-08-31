@@ -22,7 +22,22 @@ enum PhoneNumber {
     /// (M2) must hash the identical form or nothing ever matches.
     static func hashForMatching(e164: String) -> String {
         let stored = e164.hasPrefix("+") ? String(e164.dropFirst()) : e164
-        let digest = SHA256.hash(data: Data(stored.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: Data(stored.utf8)).hexString
+    }
+}
+
+extension Digest {
+    /// Lowercase hex, the form the server stores. Hand-rolled because
+    /// `String(format: "%02x")` per byte is ~30x slower, and building the
+    /// contact index hashes every phone number in the address book.
+    var hexString: String {
+        let digits = Array("0123456789abcdef".utf8)
+        var characters: [UInt8] = []
+        characters.reserveCapacity(Self.byteCount * 2)
+        for byte in self {
+            characters.append(digits[Int(byte >> 4)])
+            characters.append(digits[Int(byte & 0x0F)])
+        }
+        return String(decoding: characters, as: UTF8.self)
     }
 }
