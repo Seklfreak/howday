@@ -3,9 +3,10 @@
 
 After testflight.yaml uploads a build, this finds that build in App Store Connect
 (by build number), sets its beta build localization `whatsNew` to the release
-changelog, adds it to the named beta groups, and submits it for beta review.
-Notes first, distribution second: adding the build is what notifies testers, and
-they should have the changelog by then. Every step is idempotent.
+changelog, adds it to the named beta groups, expires any older build still
+sitting in beta review, and submits the new one for review. Notes first,
+distribution second: adding the build is what notifies testers, and they should
+have the changelog by then. Every step is idempotent.
 
 Distribution has to happen here rather than being a group setting. A group's
 `hasAccessToAllBuilds` ("automatic distribution") is create-only — App Store
@@ -158,10 +159,11 @@ def main() -> None:
         warn_exit(f"setting What-to-Test failed ({e.code}): {e.read().decode(errors='replace')}")
 
     print(f"Set What-to-Test for build {label} ({len(notes)} chars).")
-    distribute(app_id, build_id, label, args.groups, tok)
+    distribute(app_id, build_id, args.build, label, args.groups, tok)
 
 
-def distribute(app_id: str, build_id: str, label: str, group_names: str, tok: str) -> None:
+def distribute(app_id: str, build_id: str, build_number: str, label: str,
+               group_names: str, tok: str) -> None:
     """Add the build to each named beta group — this is what releases it to testers.
 
     External groups only: an internal group has every build by definition, and
@@ -199,7 +201,48 @@ def distribute(app_id: str, build_id: str, label: str, group_names: str, tok: st
             sys.stderr.write(f"::warning::TestFlight: distributing build {label} to "
                              f"{group['attributes']['name']} failed ({e.code}): {body}\n")
     if attached:
+        expire_superseded(app_id, build_id, build_number, label, tok)
         submit_for_review(build_id, label, tok)
+
+
+def expire_superseded(app_id: str, build_id: str, build_number: str, label: str,
+                      tok: str) -> None:
+    """Expire older builds still waiting on (or in) beta review.
+
+    Every release bumps the marketing version, so each public build needs a
+    real Beta App Review, and a stale build queued ahead of this one only adds
+    hours before testers see the new one. There is no API to withdraw a
+    betaAppReviewSubmission — expiring the build is what cancels its review.
+    """
+    url = (f"{API}/v1/builds?filter[app]={app_id}&filter[expired]=false"
+           "&filter[betaAppReviewSubmission.betaReviewState]=WAITING_FOR_REVIEW,IN_REVIEW"
+           "&limit=200")
+    try:
+        pending = api("GET", url, tok)
+    except urllib.error.HTTPError as e:
+        sys.stderr.write(f"::warning::TestFlight: listing builds pending review failed "
+                         f"({e.code}): {e.read().decode(errors='replace')}\n")
+        return
+    for build in pending.get("data") or []:
+        version = (build.get("attributes") or {}).get("version") or ""
+        # Build numbers are GITHUB_RUN_NUMBER, so numeric order is release
+        # order: only expire strictly older builds, so a re-run of an old tag
+        # can never take down a newer build's review.
+        try:
+            superseded = build["id"] != build_id and int(version) < int(build_number)
+        except ValueError:
+            superseded = False
+        if not superseded:
+            continue
+        try:
+            api("PATCH", f"{API}/v1/builds/{build['id']}", tok,
+                {"data": {"type": "builds", "id": build["id"],
+                          "attributes": {"expired": True}}})
+            print(f"Expired build {version}, superseded by {label} — its pending "
+                  "beta review is withdrawn.")
+        except urllib.error.HTTPError as e:
+            sys.stderr.write(f"::warning::TestFlight: expiring superseded build {version} "
+                             f"failed ({e.code}): {e.read().decode(errors='replace')}\n")
 
 
 def submit_for_review(build_id: str, label: str, tok: str) -> None:
