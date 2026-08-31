@@ -57,6 +57,17 @@ extension CountryCode {
         return nil
     }
 
+    /// The country a number typed in international form carries with it —
+    /// "+49 176…", "0049 176…" — and the national part that follows. Nil for
+    /// a number typed the way it is dialled at home, which is the common case
+    /// and leaves the picker in charge.
+    static func international(in input: String) -> (country: CountryCode, national: String)? {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        let digits = trimmed.filter(\.isNumber)
+        guard trimmed.hasPrefix("+") || digits.hasPrefix("00") else { return nil }
+        return split(internationalDigits: trimmed.hasPrefix("+") ? digits : String(digits.dropFirst(2)))
+    }
+
     /// The picker's search, best match first. A short query is tried as an
     /// ISO code before anything else, because the code is what people type
     /// and it is usually *not* part of the country's own name: searching

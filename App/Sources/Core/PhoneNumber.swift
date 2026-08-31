@@ -2,17 +2,38 @@ import CryptoKit
 import Foundation
 
 enum PhoneNumber {
+    /// Every country on the North American Numbering Plan (+1 — the US,
+    /// Canada, much of the Caribbean) uses exactly ten national digits.
+    static let nanpNationalDigits = 10
+
+    /// How many national digits a calling code takes, where we are sure of it.
+    /// Nil means "nothing tighter than E.164's own bounds" — most of the
+    /// world, where the length varies by carrier and a guess would reject
+    /// somebody's real number.
+    ///
+    /// +1 is worth knowing exactly: it is what most people here will type,
+    /// and it is what App Review dials. A number one digit short otherwise
+    /// spends an SMS and comes back as a Twilio 60200 nobody can read.
+    static func nationalDigitCount(forDial dial: Int) -> Int? {
+        dial == 1 ? nanpNationalDigits : nil
+    }
+
+    /// The national digits as E.164 counts them: separators gone, and without
+    /// the trunk prefix people dial at home. (Italy is the one place that
+    /// keeps its leading 0 — on landlines, which can't take an SMS.)
+    static func nationalDigits(_ national: String) -> String {
+        String(national.filter(\.isNumber).drop(while: { $0 == "0" }))
+    }
+
     /// E.164 with leading + ("+15551234567") from a picked country and the
     /// number as typed nationally, as the Supabase auth API expects. Returns
     /// nil while the digits can't be a phone number yet — which is what keeps
     /// the "Send code" button disabled.
     static func e164(country: CountryCode, national: String) -> String? {
-        // People type their number the way they'd dial it at home, and the
-        // national trunk prefix is not part of E.164. (Italy is the one place
-        // that keeps its leading 0 — on landlines, which can't take an SMS.)
-        let digits = national.filter(\.isNumber).drop(while: { $0 == "0" })
+        let digits = nationalDigits(national)
         let full = "\(country.dial)\(digits)"
         guard digits.count >= 4, full.count <= 15 else { return nil }
+        if let expected = nationalDigitCount(forDial: country.dial), digits.count != expected { return nil }
         return "+" + full
     }
 

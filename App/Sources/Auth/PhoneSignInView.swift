@@ -32,7 +32,28 @@ struct PhoneSignInView: View {
     @State private var attemptedCode: String?
     @FocusState private var focus: Field?
 
-    private var e164: String? { PhoneNumber.e164(country: country, national: national) }
+    /// What will actually be sent. A number typed in international form
+    /// carries its own country and overrides the picker — derived on every
+    /// read rather than written back into the field, because rewriting text
+    /// somebody is still typing races their next keystroke and can swallow a
+    /// digit. It did: App Review sent "+1505550001", one zero short of the
+    /// test number, and spent the rest of the session hunting for a country
+    /// that would take it.
+    private var resolved: (country: CountryCode, national: String) {
+        CountryCode.international(in: national) ?? (country, national)
+    }
+
+    private var e164: String? { PhoneNumber.e164(country: resolved.country, national: resolved.national) }
+
+    /// Why "Send code" is still dim, once something is typed. A disabled
+    /// button explains nothing on its own, and the number being refused
+    /// before an SMS is spent is only an improvement if the person can tell
+    /// that is what happened. The wording stays general on purpose: the app
+    /// knows the number is not usable, not which digit is wrong.
+    private var numberHint: String? {
+        guard e164 == nil, !PhoneNumber.nationalDigits(resolved.national).isEmpty else { return nil }
+        return "That doesn't look like a complete phone number."
+    }
 
     var body: some View {
         ZStack {
@@ -64,6 +85,13 @@ struct PhoneSignInView: View {
             Analytics.screen(.signIn)
             focus = .phone
         }
+        .onChange(of: country) { _, _ in
+            // Picking from the list is an explicit answer to "which country",
+            // so a "+49" still sitting in the field must not keep overriding
+            // it. Rewriting the text is safe here in a way it never is while
+            // typing: this runs on a discrete tap, with nothing in flight.
+            if let match = CountryCode.international(in: national) { national = match.national }
+        }
         .onDisappear { countdown?.cancel() }
     }
 
@@ -87,8 +115,8 @@ struct PhoneSignInView: View {
                     showCountryPicker = true
                 } label: {
                     HStack(spacing: 6) {
-                        Text(country.flag)
-                        Text(country.dialText).monospacedDigit()
+                        Text(resolved.country.flag)
+                        Text(resolved.country.dialText).monospacedDigit()
                         Image(systemName: "chevron.down").font(.caption2)
                     }
                     .foregroundStyle(.primary)
@@ -96,7 +124,7 @@ struct PhoneSignInView: View {
                     .frame(height: 52)
                     .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
                 }
-                .accessibilityLabel("Country: \(country.name), \(country.dialText)")
+                .accessibilityLabel("Country: \(resolved.country.name), \(resolved.country.dialText)")
 
                 TextField("Phone number", text: $national)
                     .keyboardType(.phonePad)
@@ -105,12 +133,11 @@ struct PhoneSignInView: View {
                     .padding(.horizontal, 14)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-                    .onChange(of: national) { _, new in adoptPastedCountry(from: new) }
             }
 
-            Text("We text you a 6-digit code; there's no password.")
+            Text(numberHint ?? "We text you a 6-digit code; there's no password.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(numberHint == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
                 .multilineTextAlignment(.center)
 
             Button(action: sendCode) {
@@ -181,19 +208,6 @@ struct PhoneSignInView: View {
             }
             .font(.footnote)
         }
-    }
-
-    /// A number pasted or typed in full international form ("+49 176…",
-    /// "0049176…") sets the picker instead of being mangled into the national
-    /// field — the one case where people do type a country code.
-    private func adoptPastedCountry(from input: String) {
-        let trimmed = input.trimmingCharacters(in: .whitespaces)
-        let digits = trimmed.filter(\.isNumber)
-        guard trimmed.hasPrefix("+") || digits.hasPrefix("00") else { return }
-        let international = trimmed.hasPrefix("+") ? digits : String(digits.dropFirst(2))
-        guard let match = CountryCode.split(internationalDigits: international) else { return }
-        country = match.country
-        national = match.national
     }
 
     private func sendCode() {
@@ -281,28 +295,44 @@ private struct CountryPicker: View {
 
     var body: some View {
         NavigationStack {
-            List(CountryCode.matching(searchText: search)) { country in
-                Button {
-                    selection = country
-                    dismiss()
-                } label: {
-                    HStack {
-                        Text(country.flag)
-                        Text(country.name)
-                        Spacer()
-                        Text(country.dialText)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                        if country == selection {
-                            Image(systemName: "checkmark").foregroundStyle(.tint)
-                        }
-                    }
+            List {
+                // The device's own region, one tap from the top. The full list
+                // is alphabetical, so without this the first thing under a
+                // reviewer's thumb is Afghanistan — and taking the top row is
+                // exactly what someone does when the list is 200 long and they
+                // only came here because the number was refused.
+                if search.isEmpty {
+                    Section("Your country") { row(for: .deviceDefault) }
                 }
-                .buttonStyle(.plain)
+                // Still listed below in its alphabetical place: somebody
+                // scrolling to "U" for the United States should find it there.
+                Section {
+                    ForEach(CountryCode.matching(searchText: search)) { row(for: $0) }
+                }
             }
             .searchable(text: $search, prompt: "Country or code")
             .navigationTitle("Country")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    private func row(for country: CountryCode) -> some View {
+        Button {
+            selection = country
+            dismiss()
+        } label: {
+            HStack {
+                Text(country.flag)
+                Text(country.name)
+                Spacer()
+                Text(country.dialText)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                if country == selection {
+                    Image(systemName: "checkmark").foregroundStyle(.tint)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
