@@ -14,10 +14,10 @@ struct OnboardingView: View {
 
     @State private var step: Step = .contacts
     @State private var isBusy = false
-    @AppStorage("reminderConfigured") private var reminderConfigured = false
-    @AppStorage("reminderEnabled") private var reminderEnabled = true
-    @AppStorage("reminderHour") private var reminderHour = 20
-    @AppStorage("reminderMinute") private var reminderMinute = 0
+    @AppStorage(ReminderScheduler.configuredKey) private var reminderConfigured = false
+    @AppStorage(ReminderScheduler.enabledKey) private var reminderEnabled = true
+    @AppStorage(ReminderScheduler.windowStartKey) private var windowStart = ReminderScheduler.defaultWindowStart
+    @AppStorage(ReminderScheduler.windowEndKey) private var windowEnd = ReminderScheduler.defaultWindowEnd
 
     var body: some View {
         ZStack {
@@ -47,8 +47,9 @@ struct OnboardingView: View {
         page(
             symbol: "bell.circle",
             title: "Never miss a day",
-            body: "A nudge at \(reminderTimeText) to check in, and a heads-up when a friend's ring changes. "
-                + "Both are off in Settings any time, and the reminder time is yours to pick.",
+            body: "A nudge to check in at a different time each day, \(windowText), "
+                + "and a heads-up when a friend's ring changes. "
+                + "Both are off in Settings any time, and the hours are yours to pick.",
             action: "Turn on notifications",
             perform: allowNotifications
         )
@@ -85,11 +86,10 @@ struct OnboardingView: View {
         .padding(24)
     }
 
-    private var reminderTimeText: String {
-        let time = Calendar.current.date(
-            bySettingHour: reminderHour, minute: reminderMinute, second: 0, of: .now
-        ) ?? .now
-        return time.formatted(date: .omitted, time: .shortened)
+    private var windowText: String {
+        let from = ReminderSettingsView.date(minutes: windowStart).formatted(date: .omitted, time: .shortened)
+        let to = ReminderSettingsView.date(minutes: windowEnd).formatted(date: .omitted, time: .shortened)
+        return "between \(from) and \(to)"
     }
 
     private func allowContacts() {
@@ -112,7 +112,7 @@ struct OnboardingView: View {
             // One prompt covers both: the local daily reminder and the push
             // about a friend's check-in ask for the same authorization.
             let granted = await ReminderScheduler.sync(
-                enabled: true, hour: reminderHour, minute: reminderMinute
+                enabled: true, windowStart: windowStart, windowEnd: windowEnd
             )
             reminderConfigured = true
             // A toggle left "on" while iOS refuses to deliver would be a lie;

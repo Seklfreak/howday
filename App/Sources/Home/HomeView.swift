@@ -187,6 +187,8 @@ struct HomeView: View {
             do {
                 try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
                 confirmed = choice
+                // The day's done; a reminder landing later would be noise.
+                ReminderScheduler.cancelToday()
                 // The emoji stays out of it — the mood is the private part.
                 Analytics.track(isFirstToday ? "checkin_saved" : "checkin_edited")
             } catch {

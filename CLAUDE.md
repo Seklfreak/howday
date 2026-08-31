@@ -174,6 +174,25 @@ and window-geometry guessing; AXe needs neither.
   the contacts prompt on first board load; that stays the way back in for
   someone who skipped.
 
+## Daily reminder
+
+- The reminder fires at a **random minute inside a window** (default 8:00–22:00),
+  so it is not one repeating trigger: `ReminderScheduler` books one
+  non-repeating request per day (`daily-checkin-<yyyy-MM-dd>`) for the next 14
+  days and `topUp()` extends the plan on every foreground (`RootView`
+  `scenePhase`). `topUp` must never prompt — it only checks the current
+  authorization status; `sync` is the one that asks, from onboarding/Settings.
+- `reminderLastPlannedDay` (UserDefaults) is what stops a day from being booked
+  twice: a request that already fired is no longer pending, so "not pending"
+  alone can't tell "fired" from "never booked". `sync` skips today when today
+  was planned before and its request is gone.
+- Saving a check-in calls `cancelToday()`, which removes today's request and
+  records the day under `reminderCheckedInDay`; `book` skips that day so a
+  settings re-plan the same evening doesn't bring the reminder back.
+- Window edges are stored as minutes since midnight (`reminderWindowStart`/
+  `reminderWindowEnd`); the old `reminderHour`/`reminderMinute` keys and the
+  single `daily-checkin` request are ignored/removed on the next `sync`.
+
 ## Auth / Twilio
 
 - Twilio Verify on a **trial** account only delivers to verified caller IDs —

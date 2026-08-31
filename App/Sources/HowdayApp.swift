@@ -46,6 +46,7 @@ struct RootView: View {
         case ready
     }
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var stage: Stage = .loading
     /// Set once the onboarding screens have been walked through. Without it
     /// a "Not now" on the contacts prompt leaves the system permission
@@ -75,6 +76,13 @@ struct RootView: View {
             // rotated APNs token is re-uploaded without any bookkeeping.
             if stage == .ready {
                 Task { await PushRegistrar.registerIfAuthorized() }
+            }
+        }
+        .onChange(of: scenePhase) {
+            // The daily reminder is booked a fortnight ahead, one random
+            // time per day; every foreground extends the plan. Never prompts.
+            if scenePhase == .active {
+                Task { await ReminderScheduler.topUp() }
             }
         }
         .task {
