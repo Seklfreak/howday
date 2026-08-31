@@ -83,20 +83,27 @@ struct BoardView: View {
             Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
         }
         if !contactsDenied {
-            // No-op unless the app was foregrounded or contacts changed
-            // since the last upload.
-            await ContactDirectory.syncIfNeeded()
-            do {
-                board = try await withTrace("board.load") { try await withSkewRetry { try await BoardRepository().load() } }
-                errorMessage = nil
-            } catch {
-                // Leaving the tab cancels the .task mid-request; don't show
-                // that as an error — reappearing restarts the load anyway.
-                guard !error.isCancellation else { return }
-                errorMessage = error.report("board.load")
-            }
+            // Deliberately NOT awaited: the board renders from the links the
+            // previous sync established, so gating it on this one bought
+            // nothing and cost the upload's round trip (1.4s at p50, 3s at
+            // p95) on every appearance. Refresh only if an upload actually
+            // lands — rare, now that an unchanged address book skips it.
+            Task { if await ContactDirectory.syncIfNeeded() { await fetch() } }
+            await fetch()
         }
         isLoading = false
+    }
+
+    private func fetch() async {
+        do {
+            board = try await withTrace("board.load") { try await withSkewRetry { try await BoardRepository().load() } }
+            errorMessage = nil
+        } catch {
+            // Leaving the tab cancels the .task mid-request; don't show
+            // that as an error — reappearing restarts the load anyway.
+            guard !error.isCancellation else { return }
+            errorMessage = error.report("board.load")
+        }
     }
 
     /// Reload on any checkins change (insert or update). RLS already limits
@@ -195,10 +202,11 @@ private struct BoardCard: View {
     }
 
     /// The contact's photo from the viewer's address book, or a monogram.
+    /// Already decoded by BoardRepository — never decode in a body.
     @ViewBuilder
     private var avatar: some View {
-        if let data = entry.identity.photo, let image = UIImage(data: data) {
-            Image(uiImage: image)
+        if let avatar = entry.avatar {
+            Image(uiImage: avatar.image)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 56, height: 56)

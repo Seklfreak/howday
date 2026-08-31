@@ -1,4 +1,5 @@
 import Contacts
+import CryptoKit
 import Foundation
 import Supabase
 import UIKit
@@ -49,13 +50,19 @@ enum ContactDirectory {
     private actor State {
         private(set) var index: [String: Identity]?
         private(set) var needsSync = true
-        private var lastSync: Task<Void, Never>?
+        private var lastSync: Task<Bool, Never>?
 
         func setIndex(_ new: [String: Identity]) { index = new }
         func clearNeedsSync() { needsSync = false }
-        func markDirty(dropIndex: Bool) {
+        /// Both staleness hooks drop the index. A contact added while the app
+        /// was suspended never delivers CNContactStoreDidChange, so keeping
+        /// the cached index across a foreground meant that contact stayed
+        /// invisible until the next cold launch. Re-reading the address book
+        /// is off the main actor, no longer gates the board, and the
+        /// fingerprint check keeps it from becoming an upload.
+        func markDirty() {
             needsSync = true
-            if dropIndex { index = nil }
+            index = nil
         }
 
         /// Chain sync attempts instead of running them concurrently: board
@@ -64,11 +71,11 @@ enum ContactDirectory {
         /// Each queued attempt re-checks needsSync, so followers of a
         /// successful sync are no-ops while a mid-flight contacts change
         /// still gets a fresh upload afterwards.
-        func enqueueSync(_ attempt: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
+        func enqueueSync(_ attempt: @escaping @Sendable () async -> Bool) -> Task<Bool, Never> {
             let previous = lastSync
             let task = Task {
-                await previous?.value
-                await attempt()
+                _ = await previous?.value
+                return await attempt()
             }
             lastSync = task
             return task
@@ -77,15 +84,16 @@ enum ContactDirectory {
 
     private static let state = State()
 
-    /// Staleness hooks, installed on first use: returning to the foreground
-    /// re-syncs (the cheap way to keep links fresh for friends), and an
-    /// address-book edit additionally drops the cached name/photo index.
+    /// Staleness hooks, installed on first use: both returning to the
+    /// foreground and an address-book edit re-read the address book. Neither
+    /// forces an upload — that is syncIfNeeded's fingerprint check, which is
+    /// what makes them cheap enough to run this often.
     private static let observers: [NSObjectProtocol] = [
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil
         ) { _ in
             Task {
-                await state.markDirty(dropIndex: false)
+                await state.markDirty()
                 await syncIfNeeded()
             }
         },
@@ -93,37 +101,90 @@ enum ContactDirectory {
             forName: .CNContactStoreDidChange, object: nil, queue: nil
         ) { _ in
             Task {
-                await state.markDirty(dropIndex: true)
+                await state.markDirty()
                 await syncIfNeeded()
             }
         },
     ]
 
+    /// How long a successful upload stays good even when nothing in the
+    /// address book changed. Re-uploading is what eventually links a contact
+    /// who signed up *after* the last one — slow-moving enough that it does
+    /// not justify paying the round trip on every foreground.
+    private static let maxSyncAge: TimeInterval = 24 * 60 * 60
+    private static let fingerprintKey = "contacts.syncFingerprint"
+    private static let syncedAtKey = "contacts.syncedAt"
+
     /// Replace the server's view of who this user knows with the current
-    /// address book (hashes only) — at most once per foreground session or
-    /// contacts change, so it's cheap to call from every board load. On
-    /// failure the staleness flag stays set and the next call retries.
-    static func syncIfNeeded() async {
+    /// address book (hashes only). Returns true when an upload actually
+    /// happened, so callers can refresh whatever they derived from the links.
+    ///
+    /// Cheap to call from every board load and every foreground: an address
+    /// book that hashes to what was last uploaded skips the request, which is
+    /// a ~1.4s round trip at p50 (3s at p95) carrying the whole hash set.
+    /// On failure the staleness flag stays set and the next call retries.
+    @discardableResult
+    static func syncIfNeeded() async -> Bool {
         _ = observers
         guard isAuthorized,
-              (try? await Supa.client.auth.session) != nil,
-              await state.needsSync else { return }
-        await state.enqueueSync {
-            guard await state.needsSync else { return }
+              let session = try? await Supa.client.auth.session,
+              await state.needsSync else { return false }
+        let userId = session.user.id
+        return await state.enqueueSync {
+            guard await state.needsSync else { return false }
             do {
+                let index = try await currentIndex()
+                let hashes = Array(index.keys)
+                let fingerprint = fingerprint(of: hashes, userId: userId)
+                guard needsUpload(fingerprint: fingerprint) else {
+                    await state.clearNeedsSync()
+                    return false
+                }
                 try await withTrace("contacts.sync") {
-                    let index = try await currentIndex()
                     struct SyncResult: Decodable { let linked: Int }
                     let _: SyncResult = try await Supa.client.functions.invoke(
                         "sync-contacts",
-                        options: FunctionInvokeOptions(body: ["hashes": Array(index.keys)])
+                        options: FunctionInvokeOptions(body: ["hashes": hashes])
                     )
                 }
+                recordUpload(fingerprint: fingerprint)
                 await state.clearNeedsSync()
+                return true
             } catch {
                 // Stale links only mean stale visibility; the retry is free.
+                return false
             }
         }.value
+    }
+
+    /// Whether these hashes differ from the last upload, or that upload has
+    /// aged out. A missing fingerprint or timestamp means we don't know what
+    /// the server holds, so upload.
+    private static func needsUpload(fingerprint: String) -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: fingerprintKey) == fingerprint,
+              let syncedAt = defaults.object(forKey: syncedAtKey) as? Date else { return true }
+        let age = Date.now.timeIntervalSince(syncedAt)
+        // A clock moved backwards reads as a negative age — treat that as
+        // stale rather than trusting it for the next day.
+        return age < 0 || age >= maxSyncAge
+    }
+
+    private static func recordUpload(fingerprint: String) {
+        UserDefaults.standard.set(fingerprint, forKey: fingerprintKey)
+        UserDefaults.standard.set(Date.now, forKey: syncedAtKey)
+    }
+
+    /// Digest of what an upload would send, so an unchanged address book is
+    /// recognisable without keeping a second copy of the hashes around.
+    /// Sorted, because a dictionary's key order isn't stable between runs;
+    /// keyed by user id, because the same address book belongs to different
+    /// links after a sign-out and back in as someone else.
+    private static func fingerprint(of hashes: [String], userId: UUID) -> String {
+        var digest = SHA256()
+        digest.update(data: Data(userId.uuidString.utf8))
+        for hash in hashes.sorted() { digest.update(data: Data(hash.utf8)) }
+        return digest.finalize().hexString
     }
 
     /// The caller's mutual contacts with locally-resolved identities. Does
