@@ -159,7 +159,18 @@ and window-geometry guessing; AXe needs neither.
   region, so they follow the device language). `PhoneNumber.e164` drops a
   leading trunk `0` — Italy is the one country that keeps it, and only on
   landlines, which can't receive the SMS anyway. A pasted `+…`/`00…` number
-  moves the picker instead of landing in the national field.
+  moves the picker instead of landing in the national field — `PhoneNumberField`
+  is a `UIViewRepresentable` only because `shouldChangeCharactersIn` is the one
+  place a paste is distinguishable from typing (multi-character insertion vs.
+  one character per keystroke). Guessing from the text instead — a jump in
+  length between two `onChange` values — reads fast typing as a paste and
+  swallows the rest of the number. It holds its own first-responder state:
+  a `FocusState` case no SwiftUI view claims is reset to nil, which drops the
+  keyboard.
+- The country list's rows are plain `Button`s, so they need
+  `.contentShape(.rect)`: a plain button is hittable only where it draws
+  something, and the `Spacer` between the name and the dial code is most of
+  the row. Without it most taps land on nothing.
 - **Only onboarding (and Reminder settings) may raise the notification
   prompt.** `PushRegistrar.registerIfAuthorized()` deliberately never asks —
   it re-registers for APNs when permission already exists, so a rotated token

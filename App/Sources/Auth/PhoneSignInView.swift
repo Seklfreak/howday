@@ -9,11 +9,6 @@ struct PhoneSignInView: View {
         case enterCode(phone: String)
     }
 
-    private enum Field: Hashable {
-        case phone
-        case code
-    }
-
     /// How long the "Resend code" button stays disabled after a send, so a
     /// second tap can't burn an SMS on a message that's still in flight.
     private static let resendCooldown = 30
@@ -30,7 +25,11 @@ struct PhoneSignInView: View {
     /// The code already tried, so a rejected code doesn't auto-verify again
     /// on every keystroke that leaves it six digits long.
     @State private var attemptedCode: String?
-    @FocusState private var focus: Field?
+    /// The phone field is a UIKit view, so it holds its own first responder
+    /// state rather than joining SwiftUI's: a `FocusState` value no view
+    /// claims is reset to nil, which pulled the keyboard back down.
+    @State private var phoneFocused = false
+    @FocusState private var codeFocused: Bool
 
     /// What will actually be sent. A number typed in international form
     /// carries its own country and overrides the picker — derived on every
@@ -79,18 +78,24 @@ struct PhoneSignInView: View {
         }
         .tint(MoodTheme.brand.accent)
         .sheet(isPresented: $showCountryPicker) {
-            CountryPicker(selection: $country)
+            // The picker shows, and answers to, the country actually in
+            // force — which is the one a typed "+49…" carries, not the one
+            // last stored. Picking is an explicit answer to "which country",
+            // so it also takes that prefix back out of the field, even when
+            // the country picked is the one already stored. Rewriting the
+            // text is safe here in a way it never is while typing: a discrete
+            // tap, with nothing in flight.
+            CountryPicker(selection: Binding(
+                get: { resolved.country },
+                set: { picked in
+                    if let match = CountryCode.international(in: national) { national = match.national }
+                    country = picked
+                }
+            ))
         }
         .onAppear {
             Analytics.screen(.signIn)
-            focus = .phone
-        }
-        .onChange(of: country) { _, _ in
-            // Picking from the list is an explicit answer to "which country",
-            // so a "+49" still sitting in the field must not keep overriding
-            // it. Rewriting the text is safe here in a way it never is while
-            // typing: this runs on a discrete tap, with nothing in flight.
-            if let match = CountryCode.international(in: national) { national = match.national }
+            phoneFocused = true
         }
         .onDisappear { countdown?.cancel() }
     }
@@ -111,7 +116,7 @@ struct PhoneSignInView: View {
         VStack(spacing: 16) {
             HStack(spacing: 10) {
                 Button {
-                    focus = nil
+                    phoneFocused = false
                     showCountryPicker = true
                 } label: {
                     HStack(spacing: 6) {
@@ -126,13 +131,19 @@ struct PhoneSignInView: View {
                 }
                 .accessibilityLabel("Country: \(resolved.country.name), \(resolved.country.dialText)")
 
-                TextField("Phone number", text: $national)
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-                    .focused($focus, equals: .phone)
-                    .padding(.horizontal, 14)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                PhoneNumberField(
+                    text: $national,
+                    isFocused: $phoneFocused,
+                    onPasteInternational: { pastedCountry, pastedNational in
+                        // A pasted "+49 162…" belongs in the picker, not in a
+                        // field that then shows the country twice.
+                        country = pastedCountry
+                        national = pastedNational
+                    }
+                )
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
             }
 
             Text(numberHint ?? "We text you a 6-digit code; there's no password.")
@@ -162,7 +173,7 @@ struct PhoneSignInView: View {
             TextField("123456", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
-                .focused($focus, equals: .code)
+                .focused($codeFocused)
                 .font(.title2.monospacedDigit())
                 .multilineTextAlignment(.center)
                 .tracking(6)
@@ -202,7 +213,8 @@ struct PhoneSignInView: View {
                     code = ""
                     attemptedCode = nil
                     errorMessage = nil
-                    focus = .phone
+                    codeFocused = false
+                    phoneFocused = true
                 }
                 .disabled(isBusy)
             }
@@ -218,7 +230,8 @@ struct PhoneSignInView: View {
             // signin_completed measures the code step, not failed sends.
             Analytics.track("signin_code_sent")
             step = .enterCode(phone: phone)
-            focus = .code
+            phoneFocused = false
+            codeFocused = true
             startCooldown()
         }
     }
@@ -229,7 +242,7 @@ struct PhoneSignInView: View {
             Analytics.track("signin_code_resent")
             code = ""
             attemptedCode = nil
-            focus = .code
+            codeFocused = true
             startCooldown()
         }
     }
@@ -332,6 +345,10 @@ private struct CountryPicker: View {
                     Image(systemName: "checkmark").foregroundStyle(.tint)
                 }
             }
+            // A plain button is only hittable where it draws something, so
+            // without this the gap the `Spacer` opens up — most of the row —
+            // swallows taps and the list feels broken.
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
     }
