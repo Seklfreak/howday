@@ -56,7 +56,12 @@ jobs:
         with:
           sha: ${{ github.event.workflow_run.head_sha }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          build-workflow: "testflight.yaml"
+          # Path filter: supabase/-only releases change the backend the app
+          # talks to, not the app itself, so they need no new build.
+          # testflight-refresh.yaml still rebuilds monthly, so the
+          # TestFlight build cannot expire during a run of them.
+          build-workflow: |
+            testflight.yaml:^(App|Config)/|^project\.yml
           project-description: >-
             Howday is an iOS app (SwiftUI, whole repo) shipped to TestFlight
             on every version tag: a daily mood check-in shared with friends.
