@@ -60,6 +60,15 @@ and window-geometry guessing; AXe needs neither.
   the leading `+`. The signup trigger hashes that form; client-side contact
   matching (`PhoneNumber.hashForMatching`) must hash the identical form or
   nothing ever matches.
+- A contact saved the way it is dialled at home (`0176 1234567`) carries no
+  calling code, so `ContactDirectory.candidates` supplies one: the country of
+  the signed-in user's **own** number, falling back to the device region. The
+  device region alone is not enough — a German number stays German on a phone
+  set to the US. Outside the NANP that national form is how most people save
+  most numbers, and before this every one of them silently failed to match,
+  which blanks the board in *both* directions because mutuality needs both
+  links. Never hash a candidate starting with `0`: no calling code does, so it
+  cannot equal a stored number.
 - **The social graph is contacts-based** (no friendships table, no display
   names): the sync-contacts Edge Function replaces the caller's
   `contact_links` rows from hashed contact uploads, and check-in visibility

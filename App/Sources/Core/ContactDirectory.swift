@@ -205,9 +205,24 @@ enum ContactDirectory {
     /// The address-book index, rebuilt only after a contacts change.
     private static func currentIndex() async throws -> [String: Identity] {
         if let cached = await state.index { return cached }
-        let built = try await localIndex()
+        let built = try await localIndex(homeDial: await homeDial())
         await state.setIndex(built)
         return built
+    }
+
+    /// The calling code the address book's national-format numbers are most
+    /// likely missing. The signed-in user's own number answers that better
+    /// than the device region does — contacts are overwhelmingly from the
+    /// owner's own country, and a German number stays German on a phone set
+    /// to the US region — so the region is only the fallback, for the window
+    /// before sign-in and for an account with no phone on it.
+    private static func homeDial() async -> Int {
+        // Supabase stores the phone as E.164 without the leading +.
+        if let phone = try? await Supa.client.auth.session.user.phone,
+           let match = CountryCode.split(internationalDigits: phone.filter(\.isNumber)) {
+            return match.country.dial
+        }
+        return CountryCode.deviceDefault.dial
     }
 
     enum DirectoryError: LocalizedError {
@@ -219,7 +234,7 @@ enum ContactDirectory {
 
     /// Hash → identity for every contact phone number, built off the main
     /// actor since enumerating a big contact list is slow.
-    private static func localIndex() async throws -> [String: Identity] {
+    private static func localIndex(homeDial: Int) async throws -> [String: Identity] {
         try await Task.detached(priority: .userInitiated) {
             let keys = [
                 CNContactGivenNameKey, CNContactFamilyNameKey,
@@ -238,7 +253,7 @@ enum ContactDirectory {
                         photo: contact.thumbnailImageData,
                         phone: phone.value.stringValue
                     )
-                    for candidate in candidates(for: phone.value.stringValue) {
+                    for candidate in candidates(for: phone.value.stringValue, homeDial: homeDial) {
                         index[PhoneNumber.hashForMatching(e164: candidate)] = identity
                     }
                 }
@@ -250,10 +265,14 @@ enum ContactDirectory {
     /// Candidate E.164-without-plus forms for a raw contact number. We can't
     /// fully parse national formats without a phone-number library, so we
     /// hash a small candidate set — extra candidates are harmless because
-    /// matching is exact.
-    /// Known limitation: nationally-formatted non-US numbers (e.g. a German
-    /// contact saved as 0176…) won't match; saved with +49… they will.
-    private static func candidates(for raw: String) -> [String] {
+    /// matching is exact, and a guess at the wrong country just produces a
+    /// hash nothing matches.
+    ///
+    /// A number saved the way it is dialled at home ("0176 1234567") carries
+    /// no calling code, so it can only be matched by supplying one — which is
+    /// what `homeDial` is for. Outside the US that national form is how most
+    /// people save most numbers, and every one of them used to miss.
+    private static func candidates(for raw: String, homeDial: Int) -> [String] {
         let digits = raw.filter(\.isNumber)
         guard digits.count >= 7 else { return [] }
         var result: Set<String> = []
@@ -261,10 +280,29 @@ enum ContactDirectory {
             result.insert(digits)
         } else if digits.hasPrefix("00") {
             result.insert(String(digits.dropFirst(2)))
+        } else if digits.hasPrefix("0") {
+            // A trunk prefix, so this is national form and nothing else: no
+            // calling code starts with 0, so the digits as written can never
+            // equal a stored number and aren't worth hashing.
+            insert(national: digits, dial: homeDial, into: &result)
         } else {
+            // Ambiguous — either international with the + left off ("49176…")
+            // or national in a country that has no trunk prefix (every US
+            // number, and a German one saved as "176…"). Both get a candidate.
             result.insert(digits)
-            if digits.count == 10 { result.insert("1" + digits) }
+            insert(national: digits, dial: homeDial, into: &result)
         }
         return Array(result)
+    }
+
+    /// Add `<calling code><national digits>` for a number read as national
+    /// form. A length we know contradicts that reading is dropped rather than
+    /// hashed: seven digits under +1 is a local number saved without its area
+    /// code, and prefixing it only invents a number nobody has.
+    private static func insert(national digits: String, dial: Int, into result: inout Set<String>) {
+        let national = PhoneNumber.nationalDigits(digits)
+        if let expected = PhoneNumber.nationalDigitCount(forDial: dial), national.count != expected { return }
+        guard national.count + String(dial).count <= 15 else { return }
+        result.insert("\(dial)\(national)")
     }
 }
