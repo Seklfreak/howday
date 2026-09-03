@@ -21,5 +21,18 @@
       "matchSourceUrls": ["https://github.com/supabase/supabase-swift"],
       "extractVersion": "^v?(?<version>.+)$"
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "SwiftLint and XcodeGen are downloaded from their GitHub releases in the workflow, so no built-in manager sees the pinned versions. Reads the `# renovate:` annotation above each env var, so a third pinned tool needs the annotation and nothing here.",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/workflows/.*\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\s+[A-Z0-9_]+: \"(?<currentValue>[^\"]+)\""
+      ],
+      "versioningTemplate": "semver"
+    }
   ]
 }
