@@ -21,8 +21,18 @@ enum MoodEmoji {
         ]
         return blocks.flatMap { block in
             block.compactMap { value -> String? in
+                // Emoji *components* — the skin tones and the four hair
+                // swatches — also have emoji presentation, but only mean
+                // anything inside a ZWJ sequence. Alone, Apple draws them as
+                // what they are: a colour chip, or the cropped corner of a
+                // scalp, which in a mood badge reads as a clipped glyph.
+                // Swift exposes no `isEmojiComponent`, so the hair four are
+                // named by range.
+                let hairComponents: ClosedRange<UInt32> = 0x1F9B0...0x1F9B3
                 guard let scalar = Unicode.Scalar(value),
-                      scalar.properties.isEmojiPresentation else { return nil }
+                      scalar.properties.isEmojiPresentation,
+                      !scalar.properties.isEmojiModifier,
+                      !hairComponents.contains(value) else { return nil }
                 let emoji = String(scalar)
                 return suggestions.contains(emoji) ? nil : emoji
             }
