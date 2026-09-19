@@ -392,6 +392,10 @@ deno_version = 2
 [functions.push-checkin]
 verify_jwt = false
 
+# push-joined is likewise trigger-invoked, by on_contact_link_announce_join.
+[functions.push-joined]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
