@@ -45,7 +45,7 @@ enum LocalDay {
     }
 }
 
-struct Checkin: Codable, Identifiable, Sendable {
+struct Checkin: Codable, Identifiable, Sendable, Equatable {
     let id: UUID
     let userId: UUID
     let day: String

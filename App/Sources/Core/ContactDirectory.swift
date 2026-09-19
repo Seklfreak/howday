@@ -21,10 +21,21 @@ private struct MutualRow: Decodable {
 }
 
 enum ContactDirectory {
-    struct Identity: Sendable, Hashable {
+    struct Identity: Sendable, Equatable {
         let name: String
-        let photo: Data?
+        /// Decoded once and cached, not raw thumbnail bytes: the board
+        /// rebuilds on every realtime check-in, and re-decoding every
+        /// friend's photo each time was pure main-thread churn.
+        let avatar: Avatar?
         /// The matched number as saved in the address book, for sms: links.
+        let phone: String?
+    }
+
+    /// What the hash index holds per contact. Deliberately no image data —
+    /// see `localIndex`.
+    private struct ContactRef: Sendable, Equatable {
+        let identifier: String
+        let name: String
         let phone: String?
     }
 
@@ -48,12 +59,27 @@ enum ContactDirectory {
 
     /// Serializes the cached address-book index and the sync-staleness flag.
     private actor State {
-        private(set) var index: [String: Identity]?
+        private(set) var index: [String: ContactRef]?
         private(set) var needsSync = true
         private var lastSync: Task<Bool, Never>?
+        /// Contact identifier -> decoded avatar, `nil` meaning "looked, no
+        /// photo". Only ever holds the handful of contacts on the board.
+        private var avatars: [String: Avatar?] = [:]
 
-        func setIndex(_ new: [String: Identity]) { index = new }
+        func setIndex(_ new: [String: ContactRef]) { index = new }
         func clearNeedsSync() { needsSync = false }
+
+        func unresolvedAvatars(_ identifiers: [String]) -> [String] {
+            identifiers.filter { avatars.index(forKey: $0) == nil }
+        }
+
+        /// Records misses too, so a contact without a photo isn't re-fetched
+        /// on every board load.
+        func cacheAvatars(_ found: [String: Avatar], requested: [String]) {
+            for id in requested { avatars[id] = found[id] }
+        }
+
+        func avatar(_ identifier: String) -> Avatar? { avatars[identifier] ?? nil }
         /// Both staleness hooks drop the index. A contact added while the app
         /// was suspended never delivers CNContactStoreDidChange, so keeping
         /// the cached index across a foreground meant that contact stayed
@@ -63,6 +89,9 @@ enum ContactDirectory {
         func markDirty() {
             needsSync = true
             index = nil
+            // A changed address book can mean a changed photo, and these
+            // are keyed by contact identifier, which survives an edit.
+            avatars.removeAll()
         }
 
         /// Chain sync attempts instead of running them concurrently: board
@@ -124,13 +153,12 @@ enum ContactDirectory {
     /// a ~1.4s round trip at p50 (3s at p95) carrying the whole hash set.
     /// On failure the staleness flag stays set and the next call retries.
     ///
-    /// `force` re-reads the address book and uploads even when nothing in it
-    /// changed. That is the only way to re-link a contact who signed up since
-    /// the last upload, because their number was already saved then — so the
-    /// fingerprint is current and every automatic path skips. Reserve it for
-    /// an explicit user gesture; the server now backfills those links on
-    /// signup anyway (see the backfill_links_on_signup migration), and this
-    /// remains the manual retry for contacts who registered before it shipped.
+    /// `force` uploads even when the address book hasn't changed — the only
+    /// way to re-link a contact who signed up since the last upload, whose
+    /// number was already saved then, so the fingerprint is current and every
+    /// automatic path skips. For an explicit user gesture only; the server
+    /// backfills those links on signup now (backfill_links_on_signup), so
+    /// this is the retry for anyone who registered before that shipped.
     @discardableResult
     static func syncIfNeeded(force: Bool = false) async -> Bool {
         _ = observers
@@ -211,13 +239,52 @@ enum ContactDirectory {
             .rpc("my_mutuals")
             .execute()
             .value
-        return mutuals.map {
-            ($0.id, index[$0.phoneHash] ?? Identity(name: "Friend", photo: nil, phone: nil))
+        let refs = mutuals.compactMap { index[$0.phoneHash] }
+        try await resolveAvatars(for: refs.map(\.identifier))
+        var resolved: [(id: UUID, identity: Identity)] = []
+        resolved.reserveCapacity(mutuals.count)
+        for row in mutuals {
+            guard let ref = index[row.phoneHash] else {
+                resolved.append((id: row.id, identity: Identity(name: "Friend", avatar: nil, phone: nil)))
+                continue
+            }
+            resolved.append((
+                id: row.id,
+                identity: Identity(
+                    name: ref.name,
+                    avatar: await state.avatar(ref.identifier),
+                    phone: ref.phone
+                )
+            ))
         }
+        return resolved
+    }
+
+    /// Photos for the people actually on the board — a handful — rather than
+    /// for the whole address book. One batched store call, then cached until
+    /// the contacts change, because a friend checking in reloads the board.
+    private static func resolveAvatars(for identifiers: [String]) async throws {
+        let missing = await state.unresolvedAvatars(identifiers)
+        guard !missing.isEmpty else { return }
+        let found = try await Task.detached(priority: .utility) { () -> [String: Avatar] in
+            let contacts = try CNContactStore().unifiedContacts(
+                matching: CNContact.predicateForContacts(withIdentifiers: missing),
+                keysToFetch: [CNContactThumbnailImageDataKey as CNKeyDescriptor]
+            )
+            // Decoding here, off the main actor: UIImage(data:) is lazy, so
+            // leaving it to the card's body put a decode of every thumbnail
+            // on the main thread, again on every scroll pass and reload.
+            return contacts.reduce(into: [:]) { result, contact in
+                guard let data = contact.thumbnailImageData,
+                      let image = UIImage(data: data) else { return }
+                result[contact.identifier] = Avatar(image: image.preparingForDisplay() ?? image)
+            }
+        }.value
+        await state.cacheAvatars(found, requested: missing)
     }
 
     /// The address-book index, rebuilt only after a contacts change.
-    private static func currentIndex() async throws -> [String: Identity] {
+    private static func currentIndex() async throws -> [String: ContactRef] {
         if let cached = await state.index { return cached }
         let built = try await localIndex(homeDial: await homeDial())
         await state.setIndex(built)
@@ -246,29 +313,39 @@ enum ContactDirectory {
         }
     }
 
-    /// Hash → identity for every contact phone number, built off the main
-    /// actor since enumerating a big contact list is slow.
-    private static func localIndex(homeDial: Int) async throws -> [String: Identity] {
-        try await Task.detached(priority: .userInitiated) {
+    /// Hash → contact for every phone number in the address book, built off
+    /// the main actor since enumerating a big contact list is slow.
+    ///
+    /// Deliberately does NOT ask for thumbnails: this sweep exists to produce
+    /// hashes and runs on every foreground, so pulling image data for
+    /// hundreds of contacts to use it for the handful who turn out to be
+    /// mutual was most of its cost — and it competed with the refresh
+    /// animation. `resolveAvatars` fetches those afterwards.
+    ///
+    /// `.utility`, not `.userInitiated`: nothing on screen waits for this —
+    /// the board renders from the links the previous sync established — so
+    /// it should yield to whatever the user is currently looking at.
+    private static func localIndex(homeDial: Int) async throws -> [String: ContactRef] {
+        try await Task.detached(priority: .utility) {
             let keys = [
-                CNContactGivenNameKey, CNContactFamilyNameKey,
-                CNContactPhoneNumbersKey, CNContactThumbnailImageDataKey,
+                CNContactIdentifierKey, CNContactGivenNameKey,
+                CNContactFamilyNameKey, CNContactPhoneNumbersKey,
             ] as [CNKeyDescriptor]
             let request = CNContactFetchRequest(keysToFetch: keys)
-            var index: [String: Identity] = [:]
+            var index: [String: ContactRef] = [:]
             try CNContactStore().enumerateContacts(with: request) { contact, _ in
                 // Friends are shown by first name, like the address book would.
                 let name = contact.givenName.isEmpty
                     ? (contact.familyName.isEmpty ? "Friend" : contact.familyName)
                     : contact.givenName
                 for phone in contact.phoneNumbers {
-                    let identity = Identity(
+                    let ref = ContactRef(
+                        identifier: contact.identifier,
                         name: name,
-                        photo: contact.thumbnailImageData,
                         phone: phone.value.stringValue
                     )
                     for candidate in candidates(for: phone.value.stringValue, homeDial: homeDial) {
-                        index[PhoneNumber.hashForMatching(e164: candidate)] = identity
+                        index[PhoneNumber.hashForMatching(e164: candidate)] = ref
                     }
                 }
             }

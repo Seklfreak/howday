@@ -83,22 +83,19 @@ struct BoardView: View {
             Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
         }
         if !contactsDenied {
-            if forceSync {
-                // A pull-to-refresh is the escape hatch for "my friend just
-                // signed up": it ignores the fingerprint, so it re-links
-                // contacts who registered since the last upload. Awaited,
-                // unlike the automatic path — the user asked for this one,
-                // and the spinner should last as long as the work does.
-                await ContactDirectory.syncIfNeeded(force: true)
-            } else {
-                // Deliberately NOT awaited: the board renders from the links
-                // the previous sync established, so gating it on this one
-                // bought nothing and cost the upload's round trip (1.4s at
-                // p50, 3s at p95) on every appearance. Refresh only if an
-                // upload actually lands — rare, now that an unchanged
-                // address book skips it.
-                Task { if await ContactDirectory.syncIfNeeded() { await fetch() } }
-            }
+            // Never awaited, forced or not. The board renders from the links
+            // the previous sync established, so waiting bought nothing and
+            // cost the upload's round trip (1.4s at p50, 3s at p95) — and on
+            // a pull-to-refresh that round trip, plus the address-book sweep
+            // behind it, was held under the refresh control. That is what
+            // made the pull feel broken: a spinner stuck for seconds with
+            // contact I/O fighting the animation for the CPU.
+            //
+            // `forceSync` still guarantees the upload happens (it ignores
+            // the fingerprint, which is what re-links a contact who signed
+            // up since the last one); the board just picks it up when it
+            // lands rather than blocking the gesture on it.
+            Task { if await ContactDirectory.syncIfNeeded(force: forceSync) { await fetch() } }
             await fetch()
         }
         isLoading = false
@@ -212,10 +209,10 @@ private struct BoardCard: View {
     }
 
     /// The contact's photo from the viewer's address book, or a monogram.
-    /// Already decoded by BoardRepository — never decode in a body.
+    /// Already decoded by ContactDirectory — never decode in a body.
     @ViewBuilder
     private var avatar: some View {
-        if let avatar = entry.avatar {
+        if let avatar = entry.identity.avatar {
             Image(uiImage: avatar.image)
                 .resizable()
                 .scaledToFill()
