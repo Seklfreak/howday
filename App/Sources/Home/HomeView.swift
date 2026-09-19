@@ -106,7 +106,10 @@ struct HomeView: View {
     /// Tapping the emoji spreads the bar back into the six choices; picking
     /// one (or retapping your current mood) collapses it again.
     private var board: some View {
-        VStack(spacing: 0) {
+        // Handed to BoardView as its scroll-view header rather than stacked
+        // above it: outside the scroll view the mood bar stayed pinned while
+        // a pull dragged the board out from under it.
+        BoardView {
             VStack(spacing: 6) {
                 HStack(spacing: 10) {
                     if isChangingMood {
@@ -137,8 +140,6 @@ struct HomeView: View {
             .padding(.vertical, 8)
 
             Divider()
-
-            BoardView()
         }
     }
 

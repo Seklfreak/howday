@@ -5,7 +5,13 @@ import UIKit
 /// The friends board, embedded below the mood bar on the home screen.
 /// HomeView only mounts it once today's check-in exists, so the old
 /// "check in first" gate lives there now — the picker IS the gate.
-struct BoardView: View {
+struct BoardView<Header: View>: View {
+    /// Rendered inside the scroll view, above the grid. The mood bar lives
+    /// here rather than above BoardView so that a pull-to-refresh drags the
+    /// whole screen down together — pinned while the board slid out from
+    /// under it, it read as the screen coming apart.
+    @ViewBuilder let header: Header
+
     @Environment(\.scenePhase) private var scenePhase
     @State private var board = BoardState()
     @State private var isLoading = true
@@ -13,10 +19,10 @@ struct BoardView: View {
     @State private var contactsDenied = false
 
     var body: some View {
-        Group {
+        ScrollView {
+            header
             if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView().padding(.top, 48)
             } else if contactsDenied {
                 contactsPrompt
             } else {
@@ -48,26 +54,31 @@ struct BoardView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        // Same reason as the empty-board state: centred inside a scroll view
+        // it would otherwise collapse to its intrinsic height.
+        .frame(minHeight: 320)
     }
 
+    @ViewBuilder
     private var grid: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                ForEach(board.entries) { entry in
-                    BoardCard(entry: entry)
-                }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+            ForEach(board.entries) { entry in
+                BoardCard(entry: entry)
             }
-            .padding()
-            if board.entries.isEmpty {
-                ContentUnavailableView(
-                    "No friends yet",
-                    systemImage: "person.2",
-                    description: Text("Friends appear automatically once you and they have each other in your contacts.")
-                )
-            }
-            if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red).font(.footnote)
-            }
+        }
+        .padding()
+        if board.entries.isEmpty {
+            ContentUnavailableView(
+                "No friends yet",
+                systemImage: "person.2",
+                description: Text("Friends appear automatically once you and they have each other in your contacts.")
+            )
+            // ContentUnavailableView centres itself in the space it is
+            // given, and inside a scroll view that is only its own height.
+            .frame(minHeight: 280)
+        }
+        if let errorMessage {
+            Text(errorMessage).foregroundStyle(.red).font(.footnote)
         }
     }
 
