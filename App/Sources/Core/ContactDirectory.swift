@@ -39,22 +39,21 @@ enum ContactDirectory {
         let phone: String?
     }
 
-    /// Whether the system permission prompt has been answered (either way).
-    static var hasBeenAsked: Bool {
-        CNContactStore.authorizationStatus(for: .contacts) != .notDetermined
+    /// How many contacts with a phone number the app can currently read —
+    /// distinct contacts, not numbers. Comes from the cached index, so it is
+    /// free after the first board load. Contacts without a number are not
+    /// counted: they could never match anyone anyway.
+    static func visibleContactCount() async -> Int? {
+        guard let index = try? await currentIndex() else { return nil }
+        return Set(index.values.map(\.identifier)).count
     }
 
-    static var isAuthorized: Bool {
-        let status = CNContactStore.authorizationStatus(for: .contacts)
-        if #available(iOS 18, *), status == .limited { return true }
-        return status == .authorized
-    }
-
-    /// Request access if not yet determined; no-op prompt otherwise.
-    @discardableResult
-    static func requestAccess() async -> Bool {
-        let granted = try? await CNContactStore().requestAccess(for: .contacts)
-        return granted ?? false
+    /// The address book changed under the app's feet — after the limited
+    /// access picker adds contacts, for one. The system posts
+    /// CNContactStoreDidChange for that too, but not before the picker's
+    /// completion runs, and a reload racing it would read the stale index.
+    static func noteAddressBookChanged() async {
+        await state.markDirty()
     }
 
     /// Serializes the cached address-book index and the sync-staleness flag.
@@ -304,13 +303,6 @@ enum ContactDirectory {
             return match.country.dial
         }
         return CountryCode.deviceDefault.dial
-    }
-
-    enum DirectoryError: LocalizedError {
-        case accessDenied
-        var errorDescription: String? {
-            "Howday is contacts-based — enable contacts access in Settings to see your friends."
-        }
     }
 
     /// Hash → contact for every phone number in the address book, built off

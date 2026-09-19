@@ -16,7 +16,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 |---|------|--------|----------|------------|
 | 1 | Dynamic Type pass — **done** | S | low | — |
 | 2 | Invite share sheet | S | **highest** | — |
-| 3 | Limited contacts access (iOS 18) | S | medium | — |
+| 3 | Limited contacts access (iOS 18) — **done** | S | medium | — |
 | 4 | Offline check-in | M | medium | — |
 | 5 | Swift unit tests in CI | M | medium | — |
 | 6 | Named pushes | M–L | high | App Group |
@@ -77,7 +77,7 @@ anyone until somebody outside the app tells them about it.
 sheet too. Probably yes once the App Store link exists, probably not while it
 is a TestFlight link that asks the recipient to install TestFlight first.
 
-## 3. Limited contacts access (iOS 18) — S
+## 3. Limited contacts access (iOS 18) — S — done
 
 **Problem.** `ContactDirectory.isAuthorized` treats `.limited` as authorized,
 which is right for the sync, but the UI then has no idea that the user only

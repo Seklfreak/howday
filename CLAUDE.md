@@ -205,6 +205,17 @@ and window-geometry guessing; AXe needs neither.
   friend-check-in pushes, and it lands after the screen that explains them.
   That screen is also what makes the daily reminder real: before it,
   `reminderConfigured` was only ever written by a Settings visit nobody made.
+- iOS 18 **limited** contacts access counts as authorized for the sync and
+  the board, and `BoardView` shows a banner with the visible-contact count
+  and an "Add more" button (`.contactAccessPicker`, which needs
+  `import ContactsUI`, not just SwiftUI). The picker's completion runs
+  *before* `CNContactStoreDidChange` is posted, so the reload it triggers
+  calls `ContactDirectory.noteAddressBookChanged()` first — otherwise it
+  reads the cached index and the new contacts show up one refresh late.
+- A mutual whose number is no longer readable locally renders as "Friend"
+  until the next upload drops the link — the automatic sync after a
+  permission change is not awaited by the board's first fetch, so that
+  interim card is expected for a moment, not a bug in the directory.
 - `onboardingCompleted` (UserDefaults) is what stops onboarding reappearing
   on every launch after a "Not now" — the contacts authorization status alone
   can't tell a deliberate skip from a fresh install. `BoardView` still raises

@@ -1,3 +1,4 @@
+import ContactsUI
 import Supabase
 import SwiftUI
 import UIKit
@@ -17,6 +18,9 @@ struct BoardView<Header: View>: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var contactsDenied = false
+    /// Set while contacts access is iOS 18 "limited": how many contacts the
+    /// app can see, for the banner offering to add more. nil otherwise.
+    @State private var limitedContactCount: Int?
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     var body: some View {
@@ -62,6 +66,17 @@ struct BoardView<Header: View>: View {
 
     @ViewBuilder
     private var grid: some View {
+        if #available(iOS 18, *), let limitedContactCount {
+            LimitedContactsBanner(count: limitedContactCount) {
+                // The picker's completion runs before CNContactStoreDidChange
+                // lands; mark the index stale by hand so this reload reads
+                // the newly shared contacts rather than the cached sweep.
+                await ContactDirectory.noteAddressBookChanged()
+                await load(forceSync: true)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
         // The minimum card width grows with the text, so the grid drops to
         // one column at the accessibility sizes instead of squeezing names.
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150 * TypeScale.clamp(scale)), spacing: 12)], spacing: 12) {
@@ -97,6 +112,10 @@ struct BoardView<Header: View>: View {
             Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
         }
         if !contactsDenied {
+            // Read before the fetch, so the banner is there the moment the
+            // grid is: the index this counts is the one fetchMutuals needs
+            // anyway, so it costs nothing extra.
+            limitedContactCount = ContactDirectory.isLimited ? await ContactDirectory.visibleContactCount() : nil
             // Never awaited, forced or not. The board renders from the links
             // the previous sync established, so waiting bought nothing and
             // cost the upload's round trip (1.4s at p50, 3s at p95) — and on
@@ -147,6 +166,50 @@ struct BoardView<Header: View>: View {
         await load()
         for await _ in changes {
             await load()
+        }
+    }
+}
+
+/// "Howday can see 3 contacts — add more": the way back to a full board for
+/// someone who chose "Select Contacts" on the system prompt. The picker is
+/// the system's own; the app never sees the address book beyond what it
+/// returns. Only the count is shown — there is no way to know the total.
+@available(iOS 18, *)
+private struct LimitedContactsBanner: View {
+    let count: Int
+    /// Runs after the picker closes with at least one contact added.
+    let onAdded: () async -> Void
+
+    @State private var showPicker = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.plus")
+                .font(.title3)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Howday can see \(count) contact\(count == 1 ? "" : "s")")
+                    .font(.subheadline.weight(.medium))
+                Text("Friends outside that selection stay hidden.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button("Add more") {
+                Analytics.track("contacts_add_more")
+                showPicker = true
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(12)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.07))
+        }
+        .contactAccessPicker(isPresented: $showPicker) { added in
+            guard !added.isEmpty else { return }
+            Task { await onAdded() }
         }
     }
 }
