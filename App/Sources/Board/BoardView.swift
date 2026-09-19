@@ -158,12 +158,30 @@ struct BoardView<Header: View>: View {
         }
         let channel = Supa.client.channel("board-checkins")
         let changes = channel.postgresChange(AnyAction.self, schema: "public", table: "checkins")
-        await channel.subscribe()
         defer { Task { await Supa.client.removeChannel(channel) } }
         // Initial load AFTER subscribing: there is no realtime catch-up, so
         // a check-in landing mid-load would otherwise stay invisible until
-        // the next manual refresh.
+        // the next manual refresh. But not *only* after: offline, subscribe
+        // never returns, and the board sat on a spinner behind a parked
+        // check-in. So it gets a moment; past that the board loads anyway
+        // and refetches once the socket does come up, which is the
+        // catch-up the ordering exists for.
+        let subscribing = Task { await channel.subscribe() }
+        let subscribedInTime = await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await subscribing.value; return true }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(2))
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
         await load()
+        if !subscribedInTime {
+            await subscribing.value
+            await fetch()
+        }
         for await _ in changes {
             await load()
         }

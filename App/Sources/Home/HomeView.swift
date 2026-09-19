@@ -17,7 +17,12 @@ struct HomeView: View {
     /// Whether the collapsed mood bar is spread open to offer all choices.
     @State private var isChangingMood = false
     @State private var saveTask: Task<Void, Never>?
+    /// A quiet line under the picker or the mood bar — "saving when you're
+    /// back online", "yesterday's mood didn't make it" — as opposed to
+    /// `errorMessage`, which is red and means something actually refused.
+    @State private var notice: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -57,6 +62,19 @@ struct HomeView: View {
                 if !showSettings { Analytics.screen(selected == nil ? .home : .board) }
             }
             .task { await load() }
+            .task {
+                // A parked save is retried the moment the network is back,
+                // not just on the next foreground: the tunnel ending is
+                // exactly when the user is not looking at the app.
+                for await _ in Connectivity.regained() where CheckinQueue.pending != nil {
+                    await flushPending()
+                }
+            }
+            .onChange(of: scenePhase) {
+                if scenePhase == .active, !isLoading, CheckinQueue.pending != nil {
+                    Task { await flushPending() }
+                }
+            }
             .onAppear {
                 // The first pageview comes from load(); this one catches
                 // coming back from History, which leaves this view mounted.
@@ -95,8 +113,8 @@ struct HomeView: View {
             .padding(.horizontal, 24)
             .sensoryFeedback(.success, trigger: selected)
 
-            Text(errorMessage ?? " ")
-                .foregroundStyle(.red)
+            Text(errorMessage ?? notice ?? " ")
+                .foregroundStyle(errorMessage == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -133,9 +151,9 @@ struct HomeView: View {
                     }
                 }
                 .sensoryFeedback(.success, trigger: selected)
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
+                if let line = errorMessage ?? notice {
+                    Text(line)
+                        .foregroundStyle(errorMessage == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                         .font(.footnote)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
@@ -177,21 +195,84 @@ struct HomeView: View {
     }
 
     private func load() async {
-        do {
-            let userId = try await Supa.client.auth.session.user.id
+        // The stored session, not `auth.session`: the latter refreshes an
+        // expired token first and throws without a network, and the
+        // wildcard needs no server — offline used to lose the sixth emoji.
+        if let userId = Supa.client.auth.currentSession?.user.id {
             wildcard = MoodEmoji.wildcard(for: userId, day: LocalDay.string())
+        }
+        // A mood parked in a tunnel is shown at once, board and all, while
+        // the retry runs behind it. Waiting for the retry first meant a
+        // spinner for as long as a dead network takes to say so — a minute
+        // on a cellular link that is connected but going nowhere.
+        let parked = CheckinQueue.pendingForToday()
+        if let parked {
+            selected = parked.emoji
+            notice = "Saving when you're back online."
+            isLoading = false
+            Analytics.screen(.board)
+        }
+        let retry = Task { await flushPending() }
+        do {
             confirmed = try await withSkewRetry { try await CheckinRepository().today() }?.emoji
-            selected = confirmed
         } catch {
             // Backgrounding can cancel the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
             guard !error.isCancellation else { return }
-            errorMessage = error.report("home.load")
+            // Offline with a parked mood: the notice already says it is
+            // waiting, and a red error on top would only say so twice.
+            if parked == nil { errorMessage = error.report("home.load") }
         }
+        // The retry may have landed before today's row was read back, in
+        // which case the row is what it replaced, not what it saved.
+        switch await retry.value {
+        case .saved(let entry): confirmed = entry.emoji
+        case .rejected: selected = confirmed
+        default: break
+        }
+        guard parked == nil else { return }
+        selected = confirmed
         isLoading = false
         // The picker and the board are the same view in its two states, so
         // which one the load lands on is the pageview worth recording.
         Analytics.screen(selected == nil ? .home : .board)
+    }
+
+    /// Retries the parked check-in, if any, on the save chain so it can't
+    /// race a fresh tap, and reflects the outcome on screen.
+    @discardableResult
+    private func flushPending() async -> CheckinQueue.Outcome {
+        guard CheckinQueue.pending != nil else { return .nothing }
+        let previous = saveTask
+        let task = Task<CheckinQueue.Outcome, Never> {
+            await previous?.value
+            let outcome = await CheckinQueue.drain()
+            switch outcome {
+            case .nothing:
+                break
+            case .saved(let entry):
+                confirmed = entry.emoji
+                notice = nil
+                ReminderScheduler.cancelToday()
+                // Same events as a direct save: the funnel counts the
+                // check-in once, when it actually reaches the server.
+                Analytics.track(entry.isEdit ? "checkin_edited" : "checkin_saved")
+            case .stillPending:
+                notice = "Saving when you're back online."
+            case .expired:
+                // Not saved as yesterday: saveToday cannot backdate, and a
+                // parked entry must not become the way around that.
+                notice = "Yesterday's mood didn't reach the server before midnight."
+                Analytics.track("checkin_expired")
+            case .rejected(let entry, let message):
+                if selected == entry.emoji { withAnimation { selected = confirmed } }
+                notice = nil
+                errorMessage = message
+            }
+            return outcome
+        }
+        saveTask = Task { _ = await task.value }
+        return await task.value
     }
 
     /// Tapping an emoji IS the check-in — no separate confirm step, and no
@@ -205,6 +286,7 @@ struct HomeView: View {
         let isFirstToday = selected == nil
         withAnimation { selected = choice }
         errorMessage = nil
+        notice = nil
         // The board takes over the moment the first mood lands, not when the
         // save comes back — record the screen the user is actually looking at.
         if isFirstToday { Analytics.screen(.board) }
@@ -215,10 +297,22 @@ struct HomeView: View {
             do {
                 try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
                 confirmed = choice
+                // This tap reached the server, so anything parked before it
+                // is superseded — draining it later would resurrect an
+                // older choice over this one.
+                CheckinQueue.pending = nil
+                notice = nil
                 // The day's done; a reminder landing later would be noise.
                 ReminderScheduler.cancelToday()
                 // The emoji stays out of it — the mood is the private part.
                 Analytics.track(isFirstToday ? "checkin_saved" : "checkin_edited")
+            } catch where error.isTransientNetwork {
+                // No network: keep the choice on screen and park the save.
+                // Rolling back would read as the app refusing the mood, and
+                // the day would be lost unless the user came back to retry.
+                CheckinQueue.pending = .init(emoji: choice, day: LocalDay.string(), isEdit: !isFirstToday)
+                if selected == choice { notice = "Saving when you're back online." }
+                Analytics.track("checkin_queued")
             } catch {
                 // A later tap that lands supersedes this failure; only roll
                 // back if this is still what the user is looking at.

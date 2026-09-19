@@ -110,6 +110,38 @@ and window-geometry guessing; AXe needs neither.
   the dashboard. `scripts/rls-proof.sh` (env-var driven, see README) asserts
   every policy boundary against a live project — run it after RLS changes.
 
+## Offline & the check-in queue
+
+- A save that fails with a transient network error (`isTransientNetwork`)
+  is parked in `CheckinQueue` (one entry, `UserDefaults`) and retried on
+  launch, foreground, and when `NWPathMonitor` reports the network back.
+  A later save that succeeds clears it — draining it afterwards would
+  resurrect the older tap. An entry for an earlier day is **expired, never
+  saved**: `saveToday` cannot backdate and the queue must not become the
+  way around that. HomeView shows the parked emoji immediately, board and
+  all, and runs the retry behind it; waiting for the retry first was a
+  spinner for as long as a dead network takes to say so.
+- `Supa` sets `emitLocalSessionAsInitialSession: true`. The default first
+  *refreshes* the stored session and emits nil when that fails, so an
+  hour-old token with no network landed on the **sign-in screen**. Use
+  `auth.currentSession` for anything that needs only the user id (the
+  wildcard); `auth.session` refreshes and throws offline.
+- The board waits at most 2s for the realtime subscription before loading
+  — offline, `subscribe()` never returns — and refetches once it does.
+- **Simulating offline**: point `SUPABASE_URL` in `Secrets.xcconfig` at
+  `https://<ref>.invalid`. supabase-swift's keychain key is
+  `sb-<first host label>-auth-token`, so the session survives the swap;
+  any other host loses it. DNS fails instantly, but the auth retry
+  interceptor (2 retries, backoff) stacks across the board's sequential
+  requests, so the board takes ~25s to settle that way — airplane mode on
+  a device fails at once. Restore the xcconfig afterwards (gitignored, so
+  `git status` won't remind you).
+- **Planting UserDefaults in the simulator**: `simctl spawn <udid> defaults
+  write <bundle id> …` lands in the simulator-level preferences, which the
+  app can *read* but its `removeObject` never touches — an entry planted
+  that way looks un-removable. Write to the container plist instead:
+  `$(simctl get_app_container <udid> <bundle id> data)/Library/Preferences/<bundle id>.plist`.
+
 ## Realtime
 
 - **Push the user's JWT to the realtime socket before subscribing**

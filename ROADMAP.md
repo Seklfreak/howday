@@ -17,7 +17,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 | 1 | Dynamic Type pass — **done** | S | low | — |
 | 2 | Invite share sheet | S | **highest** | — |
 | 3 | Limited contacts access (iOS 18) — **done** | S | medium | — |
-| 4 | Offline check-in | M | medium | — |
+| 4 | Offline check-in — **done** | M | medium | — |
 | 5 | Swift unit tests in CI | M | medium | — |
 | 6 | Named pushes | M–L | high | App Group |
 | 7 | Widget, control, Siri | L | high | App Group, shared session, 4 |
@@ -100,7 +100,7 @@ off" state never appears, and nothing explains why their friends are missing.
 **Decisions.** Whether onboarding should mention limited access at all. Lean
 no: the system sheet explains it, and the banner catches the outcome.
 
-## 4. Offline check-in — M
+## 4. Offline check-in — M — done
 
 **Problem.** The tap is the whole product, and in a tunnel it fails: `lockIn`
 rolls `selected` back to the last confirmed emoji and shows an error. The day
