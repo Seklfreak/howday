@@ -1,9 +1,10 @@
 // Contact sync: receives SHA-256 hashes of the caller's contacts' phone
-// numbers (E.164 WITHOUT leading +, hashed on-device) and replaces the
-// caller's contact_links rows with the registered users among them. Only
-// hashes travel — names and photos never leave the device. Mutual links
-// (both people in each other's contacts) are what unlock check-in
-// visibility; see the contacts_based_friends migration.
+// numbers (E.164 WITHOUT leading +, hashed on-device), stores them as the
+// caller's contact_hashes, and derives contact_links from the registered
+// users among them. Only hashes travel — names and photos never leave the
+// device. Mutual links (both people in each other's contacts) are what
+// unlock check-in visibility; see the contacts_based_friends migration, and
+// backfill_links_on_signup for why the hashes are kept rather than discarded.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MAX_HASHES = 5000;
@@ -47,35 +48,29 @@ Deno.serve(async (req) => {
     return json({ error: "unauthorized" }, 401);
   }
 
-  // Service role: phone_hash and contact_links are revoked from client
-  // roles. rpc() sends the hash array in the request body — .in() would put
-  // it in the URL, which breaks past ~1000 hashes.
+  // Service role: phone_hash, contact_hashes and contact_links are revoked
+  // from client roles. rpc() sends the hash array in the request body —
+  // .in() would put it in the URL, which breaks past ~1000 hashes.
   const admin = createClient(
     supabaseUrl,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
-  const { data: rows, error } = hashes.length > 0
-    ? await admin.rpc("match_phone_hashes", { hashes })
-    : { data: [], error: null };
-  if (error) {
-    return json({ error: error.message }, 500);
-  }
-  const ids = rows
-    .filter((r: { id: string }) => r.id !== user.id)
-    .map((r: { id: string }) => r.id);
 
   // Replace, don't merge: deleting someone from your contacts must delete
   // the link too — that is how mutuality (and their view of you) ends.
-  // One RPC, not delete-then-insert from here: concurrent invocations
-  // (board load + foreground re-sync firing together) interleaved the two
-  // statements and the loser 500'd on the primary key. The DB function is
-  // transactional and serialized per owner via an advisory lock.
-  const { data: linked, error: replaceError } = await admin.rpc(
-    "replace_contact_links",
-    { owner: user.id, ids },
+  // One RPC, not match-then-write from here: it keeps the stored hashes and
+  // the derived links from drifting, and concurrent invocations (board load
+  // + foreground re-sync firing together) used to interleave and 500 on the
+  // primary key. The DB function is transactional and serialized per owner
+  // via an advisory lock. Storing the hashes is also what lets a contact who
+  // signs up LATER link back to this upload without waiting for the next one
+  // — see the backfill_links_on_signup migration.
+  const { data: linked, error } = await admin.rpc(
+    "replace_contact_hashes",
+    { owner: user.id, hashes },
   );
-  if (replaceError) {
-    return json({ error: replaceError.message }, 500);
+  if (error) {
+    return json({ error: error.message }, 500);
   }
   return json({ linked });
 });

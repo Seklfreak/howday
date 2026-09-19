@@ -70,18 +70,31 @@ and window-geometry guessing; AXe needs neither.
   links. Never hash a candidate starting with `0`: no calling code does, so it
   cannot equal a stored number.
 - **The social graph is contacts-based** (no friendships table, no display
-  names): the sync-contacts Edge Function replaces the caller's
-  `contact_links` rows from hashed contact uploads, and check-in visibility
-  requires the link in BOTH directions (`are_mutual_contacts`). Names and
-  photos are resolved client-side from the viewer's own address book
-  (`ContactDirectory`), keyed by the `phone_hash` values `my_mutuals()`
-  returns — safe to echo because a mutual contact's number is by definition
-  already in the caller's address book.
-- `profiles` and `contact_links` are fully sealed from client roles (RLS on,
-  all grants revoked) — only service-role Edge Functions touch them. Any DB
-  function that exposes `phone_hash` beyond mutuals (`match_phone_hashes`)
-  must have EXECUTE revoked from `anon`/`authenticated` — otherwise it's a
-  phone-number oracle.
+  names): the sync-contacts Edge Function stores the caller's hashed contact
+  upload as `contact_hashes` and derives their `contact_links` rows from it
+  (`replace_contact_hashes`), and check-in visibility requires the link in
+  BOTH directions (`are_mutual_contacts`). Names and photos are resolved
+  client-side from the viewer's own address book (`ContactDirectory`), keyed
+  by the `phone_hash` values `my_mutuals()` returns — safe to echo because a
+  mutual contact's number is by definition already in the caller's address
+  book.
+- **A signup has to link backwards, because the sync almost always runs
+  before it.** Adding someone's number is what triggers your upload, so they
+  are typically not registered yet when it lands; afterwards your address
+  book is unchanged, so the client's fingerprint check skips every further
+  upload for 24h. That is why `contact_hashes` is *kept* rather than matched
+  and discarded: the `link_new_profile` trigger creates the incoming links
+  for a new profile from everyone already holding its hash. The client half
+  is syncing at sign-in (`RootView`, on reaching `.ready`) rather than at
+  first check-in, plus a forced `syncIfNeeded(force:)` on pull-to-refresh.
+- `profiles`, `contact_links` and `contact_hashes` are fully sealed from
+  client roles (RLS on, all grants revoked) — only service-role Edge
+  Functions touch them. Any DB function that exposes `phone_hash` beyond
+  mutuals must have EXECUTE revoked from `anon`/`authenticated` — otherwise
+  it's a phone-number oracle. `contact_hashes` is the most sensitive table in
+  the schema: unlike everything else it retains hashes of numbers belonging
+  to **non-users**, so never expose it, and never add a function that takes a
+  hash and answers whether it is present.
 - **`security definer` functions that call pgcrypto need
   `set search_path = public, extensions`** — Supabase preinstalls pgcrypto in
   the `extensions` schema, and a search_path pinned to `public` alone makes

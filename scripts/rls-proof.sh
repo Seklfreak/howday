@@ -97,7 +97,14 @@ check "clients cannot read the push rate-limit log" \
 check "clients cannot reset their push cooldown" \
   "$(rest "$AT" -X POST "$URL/rest/v1/checkin_push_log" -d "{\"user_id\":\"$AID\"}")" "permission denied"
 check "link replace rpc is service-role only" \
-  "$(rest "$AT" -X POST "$URL/rest/v1/rpc/replace_contact_links" -d "{\"owner\":\"$AID\",\"ids\":[]}")" "permission denied"
+  "$(rest "$AT" -X POST "$URL/rest/v1/rpc/replace_contact_hashes" -d "{\"owner\":\"$AID\",\"hashes\":[]}")" "permission denied"
+
+# 4c. The stored hash set is the one thing that would turn this schema into a
+# phone-number oracle if it ever leaked — it holds hashes of non-users too.
+check "clients cannot read contact_hashes" \
+  "$(rest "$AT" "$URL/rest/v1/contact_hashes?select=phone_hash")" "permission denied"
+check "clients cannot forge contact_hashes" \
+  "$(rest "$AT" -X POST "$URL/rest/v1/contact_hashes" -d "{\"owner_id\":\"$AID\",\"phone_hash\":\"$BHASH\"}")" "permission denied"
 rest "$AT" -X POST "$URL/rest/v1/rpc/unregister_device_token" -d "{\"device_token\":\"$FAKE_TOKEN\"}" > /dev/null
 
 # 5. sync-contacts input validation

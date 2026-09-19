@@ -123,20 +123,31 @@ enum ContactDirectory {
     /// book that hashes to what was last uploaded skips the request, which is
     /// a ~1.4s round trip at p50 (3s at p95) carrying the whole hash set.
     /// On failure the staleness flag stays set and the next call retries.
+    ///
+    /// `force` re-reads the address book and uploads even when nothing in it
+    /// changed. That is the only way to re-link a contact who signed up since
+    /// the last upload, because their number was already saved then — so the
+    /// fingerprint is current and every automatic path skips. Reserve it for
+    /// an explicit user gesture; the server now backfills those links on
+    /// signup anyway (see the backfill_links_on_signup migration), and this
+    /// remains the manual retry for contacts who registered before it shipped.
     @discardableResult
-    static func syncIfNeeded() async -> Bool {
+    static func syncIfNeeded(force: Bool = false) async -> Bool {
         _ = observers
         guard isAuthorized,
-              let session = try? await Supa.client.auth.session,
-              await state.needsSync else { return false }
+              let session = try? await Supa.client.auth.session else { return false }
+        // Dropping the cached index is half of what force means: a manual
+        // refresh should see contacts added while the app was suspended.
+        if force { await state.markDirty() }
+        guard await state.needsSync else { return false }
         let userId = session.user.id
         return await state.enqueueSync {
-            guard await state.needsSync else { return false }
+            guard force || await state.needsSync else { return false }
             do {
                 let index = try await currentIndex()
                 let hashes = Array(index.keys)
                 let fingerprint = fingerprint(of: hashes, userId: userId)
-                guard needsUpload(fingerprint: fingerprint) else {
+                guard force || needsUpload(fingerprint: fingerprint) else {
                     await state.clearNeedsSync()
                     return false
                 }

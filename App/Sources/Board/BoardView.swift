@@ -24,7 +24,7 @@ struct BoardView: View {
             }
         }
         .task { await listenForChanges() }
-        .refreshable { await load() }
+        .refreshable { await load(forceSync: true) }
         .onChange(of: scenePhase) {
             // Coming back to the foreground: the socket may have dropped
             // and missed events are never replayed — refetch. This is
@@ -71,7 +71,7 @@ struct BoardView: View {
         }
     }
 
-    private func load() async {
+    private func load(forceSync: Bool = false) async {
         // First board visit triggers the contacts prompt; afterwards this is
         // a no-op and isAuthorized reflects the user's answer.
         let wasAsked = ContactDirectory.hasBeenAsked
@@ -83,12 +83,22 @@ struct BoardView: View {
             Analytics.track(ContactDirectory.isAuthorized ? "contacts_allowed" : "contacts_declined")
         }
         if !contactsDenied {
-            // Deliberately NOT awaited: the board renders from the links the
-            // previous sync established, so gating it on this one bought
-            // nothing and cost the upload's round trip (1.4s at p50, 3s at
-            // p95) on every appearance. Refresh only if an upload actually
-            // lands — rare, now that an unchanged address book skips it.
-            Task { if await ContactDirectory.syncIfNeeded() { await fetch() } }
+            if forceSync {
+                // A pull-to-refresh is the escape hatch for "my friend just
+                // signed up": it ignores the fingerprint, so it re-links
+                // contacts who registered since the last upload. Awaited,
+                // unlike the automatic path — the user asked for this one,
+                // and the spinner should last as long as the work does.
+                await ContactDirectory.syncIfNeeded(force: true)
+            } else {
+                // Deliberately NOT awaited: the board renders from the links
+                // the previous sync established, so gating it on this one
+                // bought nothing and cost the upload's round trip (1.4s at
+                // p50, 3s at p95) on every appearance. Refresh only if an
+                // upload actually lands — rare, now that an unchanged
+                // address book skips it.
+                Task { if await ContactDirectory.syncIfNeeded() { await fetch() } }
+            }
             await fetch()
         }
         isLoading = false

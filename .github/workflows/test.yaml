@@ -35,6 +35,16 @@ jobs:
           supabase db start
           supabase db lint --fail-on warning
 
+      # Container name is project_id from supabase/config.toml. Asserts the
+      # contact-graph properties the schema exists to guarantee — mutuality
+      # needs both directions, and a signup links back to syncs that predate
+      # it. Rolls itself back, so db lint above still sees a clean database.
+      - name: Contact-graph regression tests
+        run: |
+          docker exec -i supabase_db_howday \
+            psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - \
+            < supabase/tests/contact_graph.sql
+
   build:
     # macos-26 for the iOS 26 SDK, matching what testflight.yaml ships with.
     runs-on: macos-26

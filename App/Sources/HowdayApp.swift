@@ -76,6 +76,13 @@ struct RootView: View {
             // rotated APNs token is re-uploaded without any bookkeeping.
             if stage == .ready {
                 Task { await PushRegistrar.registerIfAuthorized() }
+                // Contacts used to sync only from the board, which HomeView
+                // mounts only once today's check-in exists — so somebody who
+                // signed up and didn't check in had never uploaded anything
+                // and was invisible to everyone, permanently. Reaching the
+                // signed-in UI is the honest trigger; it also covers the
+                // cold launch, which fires no willEnterForeground.
+                Task { await ContactDirectory.syncIfNeeded() }
             }
         }
         .onChange(of: scenePhase) {
