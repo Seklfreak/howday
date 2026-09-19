@@ -51,8 +51,15 @@ and window-geometry guessing; AXe needs neither.
   tree's AXLabels instead of screenshots.
 - Sign-in uses the Supabase test phone numbers with the fixed OTP (deliberately
   not in this repo — see README/rls-proof env). They're readable via the
-  Management API: `curl -H "Authorization: Bearer $(cat ~/.supabase/access-token)"
-  https://api.supabase.com/v1/projects/<ref>/config/auth` → `sms_test_otp`.
+  Management API: `curl -H "Authorization: Bearer $TOKEN"
+  https://api.supabase.com/v1/projects/<ref>/config/auth` → `sms_test_otp`,
+  where `TOKEN=$(security find-generic-password -s "Supabase CLI" -w)` — the
+  CLI keeps its login in the macOS keychain, not in `~/.supabase`.
+- A simulator that suddenly shows the sign-in screen after a test run is
+  the unsigned test host: `xcodebuild test … CODE_SIGNING_ALLOWED=NO`
+  installs an unsigned Howday.app over the signed one, and unsigned
+  binaries can't read the keychain. Reinstall a signed build; the session
+  is still there.
 
 ## Supabase / data model
 
