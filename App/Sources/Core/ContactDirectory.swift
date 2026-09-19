@@ -142,7 +142,10 @@ enum ContactDirectory {
         guard await state.needsSync else { return false }
         let userId = session.user.id
         return await state.enqueueSync {
-            guard force || await state.needsSync else { return false }
+            // Read first: `await` cannot sit to the right of `||`, which
+            // makes it an autoclosure the actor can't be touched from.
+            let stillStale = await state.needsSync
+            guard force || stillStale else { return false }
             do {
                 let index = try await currentIndex()
                 let hashes = Array(index.keys)
