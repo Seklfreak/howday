@@ -27,6 +27,14 @@ declare
   instance uuid := '00000000-0000-0000-0000-000000000000';
   linked integer;
 begin
+  -- Configure push, so the announcement below queues a real request. Both
+  -- halves roll back with everything else, and pg_net only dispatches after
+  -- commit, so nothing is actually sent.
+  insert into public.push_config (project_url) values ('https://test.supabase.co')
+    on conflict (id) do update set project_url = excluded.project_url;
+  delete from vault.secrets where name = 'push_fn_secret';
+  perform vault.create_secret('test-secret', 'push_fn_secret');
+
   insert into auth.users (id, instance_id, aud, role, phone)
   values (a, instance, 'authenticated', 'authenticated', a_phone);
 
@@ -76,6 +84,15 @@ begin
   if (select count(*) from public.join_announcements
       where recipient_id = a and new_user_id = b) <> 1 then
     raise exception 'B joining was not announced to A exactly once';
+  end if;
+
+  -- ...and it reached pg_net addressed at push_config.project_url, which is
+  -- what proves the trigger no longer takes the URL from Vault.
+  if not exists (
+    select 1 from net.http_request_queue
+    where url = 'https://test.supabase.co/functions/v1/push-joined'
+  ) then
+    raise exception 'the announcement queued no push to push_config.project_url';
   end if;
 
   -- A routine re-sync re-inserts the same links; it must not re-announce.

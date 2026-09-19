@@ -121,9 +121,13 @@ and window-geometry guessing; AXe needs neither.
 
 ## Push notifications
 
-- The check-in push trigger reads `project_url` and `push_fn_secret` from
-  **Vault** (repo is public — no project ref in migrations) and silently
-  no-ops if they're absent; the `push-checkin` Edge Function has
+- The push triggers read `project_url` from the sealed `push_config` table
+  and `push_fn_secret` from **Vault** — the URL is the origin every client
+  already ships, so only the shared secret is encrypted; neither is in a
+  migration, because the repo is public. Both silently no-op if absent.
+  (`ALTER DATABASE … SET` would be cheaper than either, but Postgres refuses
+  a custom parameter there without superuser, which Supabase's `postgres`
+  role is not.) The `push-checkin` Edge Function has
   `verify_jwt = false` and is gated only by the `x-push-secret` header.
 - The trigger fires on insert **and** on an emoji change to a recent day, so
   edits notify too. Edits are rate limited per author (30 min) via the sealed

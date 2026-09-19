@@ -53,12 +53,18 @@ redistribution.
         PUSH_FN_SECRET=$(openssl rand -hex 32)
       supabase functions deploy push-checkin
       ```
-   3. Tell the DB trigger where to call (SQL editor; Vault keeps the project
-      ref and secret out of this public repo):
+   3. Tell the DB triggers where to call (SQL editor; both keep the project
+      ref and the secret out of this public repo). The URL is not a secret —
+      it is the origin every client already ships — so it lives in a sealed
+      table rather than Vault; only the shared secret is encrypted:
       ```sql
-      select vault.create_secret('https://<PROJECT_REF>.supabase.co', 'project_url');
+      insert into public.push_config (project_url)
+        values ('https://<PROJECT_REF>.supabase.co')
+        on conflict (id) do update set project_url = excluded.project_url;
       select vault.create_secret('<the same PUSH_FN_SECRET value>', 'push_fn_secret');
       ```
+      Until both are set the triggers no-op silently, so check-ins and
+      contact syncs keep working on a project without push configured.
 6. **Analytics** (optional) — add a website in a self-hosted
    [Umami](https://umami.is) instance with any domain that marks it as the app
    (e.g. `howday.ios`, which is the `hostname` `Analytics` sends), then put
