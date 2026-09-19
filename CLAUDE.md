@@ -283,6 +283,26 @@ and window-geometry guessing; AXe needs neither.
   Test OTPs), not Twilio — they send no SMS and are free. The credentials are
   deliberately NOT in this repo (public); they're needed for simulator sign-ins.
 
+## Unit tests
+
+- `Tests/` is the `HowdayTests` target (Swift Testing, `@testable import
+  Howday`), run by `xcodebuild test -scheme Howday` — the scheme is
+  declared explicitly in `project.yml` so it includes the test target;
+  CI's build job runs `test`, not `build`. Local:
+  `xcodebuild test -project Howday.xcodeproj -scheme Howday -destination
+  'platform=iOS Simulator,id=<UDID>' CODE_SIGNING_ALLOWED=NO`.
+- It covers the pure pieces, which is where every client regression has
+  been: `PhoneNumber`, `CountryCode`, `ContactDirectory.candidates`,
+  `MoodEmoji`, `LocalDay`, `ReminderScheduler.plan` (the booking logic
+  minus the random draw and the notification center), and
+  `CheckinQueue.drain` (with an injected save). Keep new logic in that
+  shape — a pure function beside the side effect — so it lands here too.
+- `#expect(cond, message)` takes a `Comment`, which is a string *literal*
+  type: pass `"\(value)"`, not `value`, or it fails to compile.
+- `CheckinQueueTests` is `.serialized` and points `CheckinQueue.defaults`
+  at a throwaway suite per test; the queue is process-wide state, and
+  Swift Testing runs suites in parallel by default.
+
 ## CI (mirrors lab-tracker)
 
 - `test.yaml` compile-checks; green `main` → `release.yaml`

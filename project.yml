@@ -86,3 +86,38 @@ targets:
           address book. Names and photos never leave your device.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+
+  # Unit tests for the pure pieces — phone parsing, contact candidates, the
+  # wildcard, the local day, the reminder planner, the check-in queue —
+  # which is where every client-side regression so far has been.
+  HowdayTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Howday
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+# Explicit so the Howday scheme runs the tests: xcodegen's generated scheme
+# for the app target alone would not, and CI runs `xcodebuild test`.
+schemes:
+  Howday:
+    build:
+      targets:
+        Howday: all
+        HowdayTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HowdayTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

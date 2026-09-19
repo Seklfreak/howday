@@ -38,17 +38,21 @@ enum CheckinQueue {
 
     private static let key = "pendingCheckin"
 
+    /// Where the entry lives. Tests point this at a throwaway suite so they
+    /// never touch the real one; nothing else should assign it.
+    static var defaults: UserDefaults = .standard
+
     static var pending: Pending? {
         get {
-            guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+            guard let data = defaults.data(forKey: key) else { return nil }
             return try? JSONDecoder().decode(Pending.self, from: data)
         }
         set {
             guard let newValue, let data = try? JSONEncoder().encode(newValue) else {
-                UserDefaults.standard.removeObject(forKey: key)
+                defaults.removeObject(forKey: key)
                 return
             }
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 

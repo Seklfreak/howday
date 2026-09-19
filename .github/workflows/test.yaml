@@ -1,6 +1,6 @@
 name: Test
 
-# Compile-check the app on every push/PR. Green main auto-cuts a release
+# Compile-check and unit-test the app on every push/PR. Green main auto-cuts a release
 # (release.yaml), which tags and triggers the TestFlight upload.
 on:
   push:
@@ -93,12 +93,16 @@ jobs:
       - name: SwiftLint
         run: swiftlint lint --strict
 
-      - name: Build (iOS Simulator, unsigned)
+      # `test`, not `build`: it compiles the app the same way and then runs
+      # the HowdayTests target (Tests/) on the simulator. Unsigned is fine
+      # for unit tests; only Keychain writes would mind, and nothing here
+      # signs in.
+      - name: Build and test (iOS Simulator, unsigned)
         run: |
           SIM=$(xcrun simctl list devices available -j \
             | python3 -c "import sys,json; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for r in d.values() for x in r if 'iPhone' in x['name']))")
           echo "Using simulator $SIM"
-          xcodebuild build \
+          xcodebuild test \
             -project Howday.xcodeproj -scheme Howday \
             -destination "id=$SIM" \
             CODE_SIGNING_ALLOWED=NO

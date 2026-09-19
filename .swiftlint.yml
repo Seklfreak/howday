@@ -3,6 +3,7 @@
 # enforced in CI).
 included:
   - App/Sources
+  - Tests
 
 line_length:
   warning: 140

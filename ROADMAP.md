@@ -18,7 +18,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 | 2 | Invite share sheet | S | **highest** | — |
 | 3 | Limited contacts access (iOS 18) — **done** | S | medium | — |
 | 4 | Offline check-in — **done** | M | medium | — |
-| 5 | Swift unit tests in CI | M | medium | — |
+| 5 | Swift unit tests in CI — **done** | M | medium | — |
 | 6 | Named pushes | M–L | high | App Group |
 | 7 | Widget, control, Siri | L | high | App Group, shared session, 4 |
 
@@ -128,7 +128,7 @@ is lost unless the user remembers to try again.
 **Verify.** Simulator with network conditioner off/on; the existing AXe loop.
 Unit test the queue's day-rollover rule (see item 5).
 
-## 5. Swift unit tests in CI — M
+## 5. Swift unit tests in CI — M — done
 
 **Problem.** There are none. The SQL graph tests cover the schema, but every
 client-side regression in the history has been in pure code: national-number

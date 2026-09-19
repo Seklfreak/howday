@@ -87,25 +87,31 @@ enum ReminderScheduler {
         UserDefaults.standard.set(today, forKey: checkedInDayKey)
     }
 
-    /// Books one request for every day from today through the horizon whose
-    /// day key sorts after `lastDone`, each at a random minute inside the
-    /// window. Today's slot is drawn from what is left of the window; if the
-    /// window has already closed, today gets nothing.
-    private static func book(
-        after lastDone: String, windowStart: Int, windowEnd: Int, in center: UNUserNotificationCenter
-    ) async {
+    /// One day's booking: the day key, its date, and the minutes (since
+    /// midnight) the reminder may fire in.
+    struct Slot: Equatable {
+        let day: String
+        let date: Date
+        let window: ClosedRange<Int>
+    }
+
+    /// Which days get a request, and in what window each — everything about
+    /// booking except the random draw and the notification center, so it
+    /// can be tested. Days from `now` through the horizon whose key sorts
+    /// after `lastDone`; today's window is what is left of it, and today
+    /// gets nothing if the window has closed or the day is already checked
+    /// in. `lastDay` is what the caller records as planned: it advances
+    /// over skipped days too, so a day whose window had closed is not
+    /// re-planned on the next foreground.
+    static func plan(
+        after lastDone: String, windowStart: Int, windowEnd: Int, checkedInDay: String?, now: Date
+    ) -> (slots: [Slot], lastDay: String) {
         let calendar = Calendar.current
-        let now = Date.now
         let clock = calendar.dateComponents([.hour, .minute], from: now)
         // Leave a minute so today's trigger is never already in the past.
         let minutesElapsedToday = (clock.hour ?? 0) * 60 + (clock.minute ?? 0) + 1
 
-        let content = UNMutableNotificationContent()
-        content.title = "How are you?"
-        content.body = "Check in with your mood for today."
-        content.sound = .default
-
-        let checkedInDay = UserDefaults.standard.string(forKey: checkedInDayKey)
+        var slots: [Slot] = []
         var lastDay = lastDone
         for offset in 0..<horizonDays {
             guard let date = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
@@ -117,16 +123,36 @@ enum ReminderScheduler {
 
             let earliest = offset == 0 ? max(windowStart, minutesElapsedToday) : windowStart
             guard earliest <= windowEnd else { continue }
-            let minute = Int.random(in: earliest...windowEnd)
+            slots.append(Slot(day: day, date: date, window: earliest...windowEnd))
+        }
+        return (slots, lastDay)
+    }
 
-            var time = calendar.dateComponents([.year, .month, .day], from: date)
+    /// Books one request per planned slot (see `plan`), each at a random
+    /// minute inside its window.
+    private static func book(
+        after lastDone: String, windowStart: Int, windowEnd: Int, in center: UNUserNotificationCenter
+    ) async {
+        let content = UNMutableNotificationContent()
+        content.title = "How are you?"
+        content.body = "Check in with your mood for today."
+        content.sound = .default
+
+        let planned = plan(
+            after: lastDone, windowStart: windowStart, windowEnd: windowEnd,
+            checkedInDay: UserDefaults.standard.string(forKey: checkedInDayKey), now: .now
+        )
+        let calendar = Calendar.current
+        for slot in planned.slots {
+            let minute = Int.random(in: slot.window)
+            var time = calendar.dateComponents([.year, .month, .day], from: slot.date)
             time.hour = minute / 60
             time.minute = minute % 60
             let trigger = UNCalendarNotificationTrigger(dateMatching: time, repeats: false)
-            let request = UNNotificationRequest(identifier: requestPrefix + day, content: content, trigger: trigger)
+            let request = UNNotificationRequest(identifier: requestPrefix + slot.day, content: content, trigger: trigger)
             try? await center.add(request)
         }
-        UserDefaults.standard.set(lastDay, forKey: lastPlannedDayKey)
+        UserDefaults.standard.set(planned.lastDay, forKey: lastPlannedDayKey)
     }
 
     private static func pendingDays(in center: UNUserNotificationCenter) async -> Set<String> {

@@ -355,7 +355,7 @@ enum ContactDirectory {
     /// no calling code, so it can only be matched by supplying one — which is
     /// what `homeDial` is for. Outside the US that national form is how most
     /// people save most numbers, and every one of them used to miss.
-    private static func candidates(for raw: String, homeDial: Int) -> [String] {
+    static func candidates(for raw: String, homeDial: Int) -> [String] {
         let digits = raw.filter(\.isNumber)
         guard digits.count >= 7 else { return [] }
         var result: Set<String> = []
