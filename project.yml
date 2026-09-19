@@ -20,6 +20,7 @@ targets:
     platform: iOS
     sources:
       - App/Sources
+      - Shared
       - App/Assets.xcassets
       - App/PrivacyInfo.xcprivacy
     dependencies:
@@ -27,6 +28,7 @@ targets:
         product: Supabase
       - package: Sentry
         product: Sentry
+      - target: HowdayNotifications
     settings:
       base:
         # Keeps the old product's name on purpose: an App ID can't be
@@ -64,6 +66,11 @@ targets:
       path: App/Howday.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
+        # Shared with the notification extension: the hash → name map it
+        # reads lives in this container. The group is attached to both App
+        # IDs in the developer portal (there is no API for that).
+        com.apple.security.application-groups:
+          - group.dev.winktech.moodring
     info:
       path: App/Info.plist
       properties:
@@ -86,6 +93,48 @@ targets:
           address book. Names and photos never leave your device.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+
+  # Notification Service Extension: rewrites "A friend just checked in" into
+  # "Anna just checked in" on the device, from the sender's phone hash in
+  # the payload and the name map the app keeps in the App Group container.
+  # No network, no Contacts access — the map is all it reads.
+  HowdayNotifications:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Notifications
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.winktech.moodring.notifications
+        DEVELOPMENT_TEAM: LNHGT6463S
+        CODE_SIGN_STYLE: Automatic
+        # Must match the containing app, or App Store Connect rejects the
+        # upload; CI passes both on the command line, which reaches every
+        # target.
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 2
+        TARGETED_DEVICE_FAMILY: 1
+        SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Howday Notifications App Store
+    entitlements:
+      path: Notifications/HowdayNotifications.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.winktech.moodring
+    info:
+      path: Notifications/Info.plist
+      properties:
+        CFBundleDisplayName: Howday Notifications
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
 
   # Unit tests for the pure pieces — phone parsing, contact candidates, the
   # wildcard, the local day, the reminder planner, the check-in queue —

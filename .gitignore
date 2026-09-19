@@ -10,3 +10,4 @@ DerivedData/
 supabase/.temp/
 supabase/.branches/
 .env
+Notifications/HowdayNotifications.entitlements

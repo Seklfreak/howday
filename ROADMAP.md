@@ -19,7 +19,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 | 3 | Limited contacts access (iOS 18) — **done** | S | medium | — |
 | 4 | Offline check-in — **done** | M | medium | — |
 | 5 | Swift unit tests in CI — **done** | M | medium | — |
-| 6 | Named pushes | M–L | high | App Group |
+| 6 | Named pushes — **done**, device check pending | M–L | high | App Group |
 | 7 | Widget, control, Siri | L | high | App Group, shared session, 4 |
 
 ---
@@ -165,7 +165,7 @@ none of it is guarded.
 
 **Decisions.** None. Land this before items 6 and 7 touch the same code.
 
-## 6. Named pushes — M–L
+## 6. Named pushes — M–L — done (device check pending)
 
 **Problem.** "A friend just checked in 💫" is the same text every time, so it
 gets muted within a week. The server can never know a name, but the sender's

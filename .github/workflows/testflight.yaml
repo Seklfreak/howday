@@ -15,7 +15,8 @@ name: TestFlight
 #   APP_STORE_TEAM_ID                                 - paid Apple Developer Team ID
 #   APPLE_DIST_CERT_P12                               - base64 of the Apple Distribution .p12
 #   APPLE_DIST_CERT_PASSWORD                          - the .p12 export password
-#   APP_STORE_PROFILE                                 - base64 of the App Store .mobileprovision
+#   APP_STORE_PROFILE                                 - base64 of the app's App Store .mobileprovision
+#   APP_STORE_PROFILE_NOTIFICATIONS                   - same, for the notification extension
 #   SUPABASE_URL / SUPABASE_ANON_KEY                  - baked into the shipped app
 #   SENTRY_DSN                                        - baked into the shipped app (crash reporting)
 #   UMAMI_URL / UMAMI_WEBSITE_ID                      - baked into the shipped app (analytics);
@@ -82,6 +83,7 @@ jobs:
           CERT_P12: ${{ secrets.APPLE_DIST_CERT_P12 }}
           CERT_PW: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
           PROFILE_B64: ${{ secrets.APP_STORE_PROFILE }}
+          PROFILE_EXT_B64: ${{ secrets.APP_STORE_PROFILE_NOTIFICATIONS }}
         run: |
           set -euo pipefail
           KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
@@ -100,14 +102,20 @@ jobs:
           echo "--- codesigning identities in keychain ---"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
-          echo "$PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/pp.mobileprovision"
-          security cms -D -i "$RUNNER_TEMP/pp.mobileprovision" > "$RUNNER_TEMP/pp.plist"
-          UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/pp.plist")
-          NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/pp.plist")
+          # One profile per signed target: the app and its notification
+          # extension each have their own App ID and profile.
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$RUNNER_TEMP/pp.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
-          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
-          echo "Installed profile '$NAME' ($UUID)"
+          install_profile() {
+            echo "$2" | base64 --decode > "$RUNNER_TEMP/$1.mobileprovision"
+            security cms -D -i "$RUNNER_TEMP/$1.mobileprovision" > "$RUNNER_TEMP/$1.plist"
+            UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/$1.plist")
+            NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/$1.plist")
+            cp "$RUNNER_TEMP/$1.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+            echo "$3=$NAME" >> "$GITHUB_ENV"
+            echo "Installed profile '$NAME' ($UUID)"
+          }
+          install_profile app "$PROFILE_B64" PROFILE_NAME
+          install_profile ext "$PROFILE_EXT_B64" PROFILE_EXT_NAME
 
       - name: Archive (manual signing)
         if: steps.gate.outputs.ready == 'true'
@@ -190,6 +198,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>dev.winktech.moodring</key><string>${PROFILE_NAME}</string>
+              <key>dev.winktech.moodring.notifications</key><string>${PROFILE_EXT_NAME}</string>
             </dict>
           </dict>
           </plist>

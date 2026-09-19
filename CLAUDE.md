@@ -173,6 +173,42 @@ and window-geometry guessing; AXe needs neither.
   match — a token sent to the wrong APNs host is just `BadDeviceToken`
   (and gets deleted by the function's dead-token cleanup).
 
+## Named pushes (Notification Service Extension)
+
+- `Notifications/` is the `HowdayNotifications` extension
+  (`dev.winktech.moodring.notifications`). The push functions send the
+  sender's `phone_hash` and a `kind` as top-level payload keys plus
+  `mutable-content: 1`; the extension looks the hash up in `names.json` in
+  the App Group container (`group.dev.winktech.moodring`) and rewrites the
+  body via `PushText`. Anything missing leaves the server's generic text.
+  The hash is safe to send because every recipient is a mutual contact.
+- `NameMap` (in `Shared/`, compiled into app and extension) is rewritten
+  by `ContactDirectory.currentIndex()` on every index build. It is written
+  with `completeFileProtectionUntilFirstUserAuthentication`, **not** full
+  protection: pushes arrive on a locked phone and the extension runs right
+  then; a fully protected file is unreadable and the lookup fails exactly
+  when it matters.
+- **The simulator never runs service extensions.** `simctl push` with
+  `mutable-content` delivers the payload untouched and the extension
+  process is never launched, so a generic banner in the simulator proves
+  nothing. Verify on a device (Console, subsystem `dev.winktech.moodring`,
+  category `notifications` logs the outcome, never the name).
+- An unsigned build (`CODE_SIGNING_ALLOWED=NO`, i.e. CI and simulator
+  smoke builds) has no entitlements and therefore no group container:
+  `containerURL(forSecurityApplicationGroupIdentifier:)` is nil and
+  `NameMap.write` is a no-op. Tests point `NameMap.directory` at a temp
+  directory for that reason.
+- Apple side: the App Group has **no App Store Connect API** — it was made
+  and attached to both App IDs in the portal by hand; bundle IDs and
+  profiles went through the API. Two profiles ship: `Moodring App Store` for the
+  app and `Howday Notifications App Store` for the extension, as the
+  `APP_STORE_PROFILE` / `APP_STORE_PROFILE_NOTIFICATIONS` secrets.
+  Changing capabilities on an App ID invalidates its profile: delete and
+  recreate through the API, then update the secret.
+- The extension's `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` must
+  equal the app's or App Store Connect rejects the upload; CI passes both
+  on the `xcodebuild` command line, which reaches every target.
+
 ## Analytics (Umami)
 
 - `Core/Umami.swift` talks to Umami's `/api/send` directly — the same JSON the
@@ -302,6 +338,9 @@ and window-geometry guessing; AXe needs neither.
 - `CheckinQueueTests` is `.serialized` and points `CheckinQueue.defaults`
   at a throwaway suite per test; the queue is process-wide state, and
   Swift Testing runs suites in parallel by default.
+- Seen once: a run with failing tests reported the failures and then
+  `xcodebuild test` never exited (a passing run exits in seconds). If a
+  CI test job hangs rather than going red, read the log for `✘` lines.
 
 ## CI (mirrors lab-tracker)
 

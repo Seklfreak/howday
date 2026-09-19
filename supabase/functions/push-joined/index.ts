@@ -39,18 +39,28 @@ Deno.serve(async (req) => {
   );
   // Re-checks mutuality server-side rather than trusting the caller: a
   // one-way link must not even reveal that somebody joined.
-  const { data: recipients, error } = await admin.rpc("join_push_recipients", {
-    recipient: recipientId,
-    newcomer: newUserId,
-  });
+  const [{ data: recipients, error }, { data: newcomer }] = await Promise.all([
+    admin.rpc("join_push_recipients", {
+      recipient: recipientId,
+      newcomer: newUserId,
+    }),
+    admin.from("profiles").select("phone_hash").eq("id", newUserId)
+      .maybeSingle(),
+  ]);
   if (error) {
     return json({ error: error.message }, 500);
   }
 
+  // The newcomer's hash lets the recipient's device name them; the
+  // mutuality check above is what makes that safe to send.
   return json(
     await sendAlerts(admin, (recipients ?? []) as Recipient[], {
       body: ALERT_BODY,
       threadId: "friend-joins",
+      payload: {
+        kind: "join",
+        ...(newcomer?.phone_hash ? { sender_hash: newcomer.phone_hash } : {}),
+      },
     }),
   );
 });

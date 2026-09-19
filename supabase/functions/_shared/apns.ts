@@ -64,7 +64,15 @@ export async function apnsJwt(): Promise<string> {
 export async function sendAlerts(
   admin: SupabaseClient,
   recipients: Recipient[],
-  alert: { body: string; threadId: string },
+  alert: {
+    body: string;
+    threadId: string;
+    // Top-level custom keys for the app's Notification Service Extension,
+    // which rewrites the generic body into a named one on the device
+    // (the server never knows a name). Their presence sets
+    // mutable-content, which is what makes iOS run the extension at all.
+    payload?: Record<string, string>;
+  },
 ): Promise<{ sent: number; of: number }> {
   if (recipients.length === 0) {
     return { sent: 0, of: 0 };
@@ -87,7 +95,9 @@ export async function sendAlerts(
             alert: { body: alert.body },
             sound: "default",
             "thread-id": alert.threadId,
+            ...(alert.payload ? { "mutable-content": 1 } : {}),
           },
+          ...alert.payload,
         }),
       });
       if (res.ok) {

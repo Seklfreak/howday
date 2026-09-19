@@ -3,6 +3,8 @@
 # enforced in CI).
 included:
   - App/Sources
+  - Shared
+  - Notifications
   - Tests
 
 line_length:

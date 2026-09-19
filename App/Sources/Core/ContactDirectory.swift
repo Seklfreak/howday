@@ -287,6 +287,11 @@ enum ContactDirectory {
         if let cached = await state.index { return cached }
         let built = try await localIndex(homeDial: await homeDial())
         await state.setIndex(built)
+        // The notification extension names a push's sender from this: the
+        // server sends the sender's hash, the map turns it into the first
+        // name the board would show. Rewritten on every index build, so an
+        // edited contact is renamed in the next push too.
+        NameMap.write(built.mapValues(\.name))
         return built
     }
 
