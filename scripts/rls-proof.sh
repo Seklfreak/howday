@@ -21,6 +21,10 @@ check() { # $1 label, $2 actual, $3 expected-substring-or-exact
   if [[ "$2" == *"$3"* ]]; then echo "PASS: $1"; ((PASS++));
   else echo "FAIL: $1 — got: ${2:0:160}"; ((FAIL++)); fi
 }
+refute() { # $1 label, $2 actual, $3 substring that must NOT appear
+  if [[ "$2" != *"$3"* ]]; then echo "PASS: $1"; ((PASS++));
+  else echo "FAIL: $1 — got: ${2:0:160}"; ((FAIL++)); fi
+}
 jsonget() { python3 -c "import json,sys
 try: d=json.load(sys.stdin)
 except Exception: print(''); sys.exit()
@@ -60,20 +64,33 @@ rest "$BT" -X POST "$URL/rest/v1/checkins?on_conflict=user_id,day" -H 'Prefer: r
   -d "{\"user_id\":\"$BID\",\"day\":\"$(date +%F)\",\"emoji\":\"🙂\"}" > /dev/null
 BCHK=$(rest "$BT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id" | jsonget 0.id)
 
+board() { # $1 token -> today's board as that user
+  rest "$1" -X POST "$URL/rest/v1/rpc/board_today" -d "{\"for_day\":\"$(date +%F)\"}"
+}
+
 # 1. Strangers see nothing
 check "stranger cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
+check "stranger's board_today excludes B" "$(board "$AT")" "[]"
 
 # 2. A one-way link grants NOTHING — the model's core property
 check "A syncs B's number" "$(sync "$AT" "[\"$BHASH\"]")" '"linked":1'
 check "one-way: A still cannot read B's checkins" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=id")" "[]"
 check "one-way: A's mutuals are empty" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "[]"
 check "one-way: B's mutuals are empty too" "$(rest "$BT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "[]"
+# board_today is SECURITY DEFINER, so it bypasses the RLS policy that would
+# otherwise catch a mistake here. Prove it enforces mutuality by itself.
+check "one-way: A's board_today still excludes B" "$(board "$AT")" "[]"
 
 # 3. The link in both directions unlocks both sides
 sync "$BT" "[\"$AHASH\"]" > /dev/null
 check "mutual: A reads B's checkin" "$(rest "$AT" "$URL/rest/v1/checkins?user_id=eq.$BID&select=emoji")" "🙂"
 check "mutual: my_mutuals returns B for A" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "$BID"
 check "mutual: my_mutuals echoes B's phone_hash" "$(rest "$AT" -X POST "$URL/rest/v1/rpc/my_mutuals" -d '{}')" "$BHASH"
+check "mutual: A's board_today includes B's checkin" "$(board "$AT")" "$BID"
+refute "board_today does not hand back the note column" "$(board "$AT")" '"note"'
+check "board_today is closed to anon" \
+  "$(curl -s -H "apikey: $KEY" -H 'Content-Type: application/json' -X POST \
+      "$URL/rest/v1/rpc/board_today" -d "{\"for_day\":\"$(date +%F)\"}")" "permission denied"
 
 # 4. Mutuality still doesn't grant writes, and the raw tables stay sealed
 check "A cannot edit B's checkin" "$(rest "$AT" -X PATCH "$URL/rest/v1/checkins?id=eq.$BCHK" -H 'Prefer: return=representation' -d '{"emoji":"😢"}')" "[]"

@@ -35,10 +35,13 @@ struct BoardRepository {
         // most of the load: 131ms for the RPC then 123ms for the select, at
         // p50. Overlapping them costs the slower of the two instead.
         async let mutuals = ContactDirectory.fetchMutuals()
+        // board_today rather than a filtered select on checkins: the table
+        // query reaches the RLS policy, which calls are_mutual_contacts once
+        // per check-in made today by ANYBODY, so it cost O(total signups)
+        // instead of O(your friends) — 140ms and 60k buffers at 20k users,
+        // against 2.4ms for the same rows through the RPC.
         async let today: [Checkin] = Supa.client
-            .from("checkins")
-            .select(CheckinRepository.columns)
-            .eq("day", value: LocalDay.string())
+            .rpc("board_today", params: ["for_day": LocalDay.string()])
             .execute()
             .value
         let (friends, rows) = try await (mutuals, today)
