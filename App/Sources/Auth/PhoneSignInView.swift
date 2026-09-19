@@ -126,7 +126,7 @@ struct PhoneSignInView: View {
                     }
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
-                    .frame(height: 52)
+                    .frame(minHeight: 52)
                     .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
                 }
                 .accessibilityLabel("Country: \(resolved.country.name), \(resolved.country.dialText)")

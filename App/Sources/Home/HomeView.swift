@@ -17,6 +17,7 @@ struct HomeView: View {
     /// Whether the collapsed mood bar is spread open to offer all choices.
     @State private var isChangingMood = false
     @State private var saveTask: Task<Void, Never>?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -32,7 +33,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationTitle(Date.now.formatted(.dateTime.weekday(.wide).month().day()))
+            .navigationTitle(title)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 NavigationLink {
@@ -78,7 +79,9 @@ struct HomeView: View {
             Text("How are you today?")
                 .font(.title.weight(.semibold))
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 24) {
+            // Two columns at the accessibility sizes: the circles grow with
+            // the text (see TypeScale), and three of them no longer fit.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: pickerColumns), spacing: 24) {
                 ForEach(choices, id: \.self) { choice in
                     EmojiButton(
                         emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
@@ -111,16 +114,17 @@ struct HomeView: View {
         // a pull dragged the board out from under it.
         BoardView {
             VStack(spacing: 6) {
-                HStack(spacing: 10) {
+                Group {
                     if isChangingMood {
-                        ForEach(choices, id: \.self) { choice in
-                            EmojiButton(
-                                emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
-                                diameter: 48, fontSize: 30
-                            ) {
-                                lockIn(choice)
-                                withAnimation { isChangingMood = false }
+                        // A row while six circles fit; at large text sizes
+                        // they don't, and the bar wraps into two rows of
+                        // three rather than running off the screen.
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 10) { moodBarChoices }
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                                moodBarChoices
                             }
+                            .padding(.horizontal, 24)
                         }
                     } else if let selected {
                         EmojiButton(emoji: selected, isSelected: true, diameter: 48, fontSize: 30) {
@@ -143,10 +147,33 @@ struct HomeView: View {
         }
     }
 
+    /// The spread-open mood bar's six buttons, shared by both of its layouts.
+    private var moodBarChoices: some View {
+        ForEach(choices, id: \.self) { choice in
+            EmojiButton(
+                emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
+                diameter: 48, fontSize: 30
+            ) {
+                lockIn(choice)
+                withAnimation { isChangingMood = false }
+            }
+        }
+    }
+
     /// The six offered emoji: the fixed suggestions plus the user's daily
     /// wildcard, laid out by the grid as two rows of three.
     private var choices: [String] {
         MoodEmoji.suggestions + (wildcard.map { [$0] } ?? [])
+    }
+
+    private var pickerColumns: Int {
+        dynamicTypeSize.isAccessibilitySize ? 2 : 3
+    }
+
+    /// "Saturday, Sep 19" — or "Sat, Sep 19" at the accessibility sizes,
+    /// where the large title otherwise truncates to "Saturday, S…".
+    private var title: String {
+        Date.now.formatted(.dateTime.weekday(dynamicTypeSize.isAccessibilitySize ? .abbreviated : .wide).month().day())
     }
 
     private func load() async {
@@ -208,19 +235,24 @@ private struct EmojiButton: View {
     let emoji: String
     let isSelected: Bool
     var isWildcard = false
+    /// Base sizes at the default text size; both follow Dynamic Type.
     let diameter: CGFloat
     let fontSize: CGFloat
     let action: () -> Void
+
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     /// Each button rings and glows in its own mood's color, not a shared
     /// accent — the ring wears the color it would turn.
     private var theme: MoodTheme { MoodTheme.forEmoji(emoji) }
 
+    private var scaledDiameter: CGFloat { diameter * TypeScale.clamp(scale) }
+
     var body: some View {
         Button(action: action) {
             Text(emoji)
-                .font(.system(size: fontSize))
-                .frame(width: diameter, height: diameter)
+                .font(.system(size: fontSize * TypeScale.clamp(scale)))
+                .frame(width: scaledDiameter, height: scaledDiameter)
                 .background(Circle().fill(.white.opacity(isSelected ? 0.10 : 0.06)))
                 .overlay {
                     if isSelected {

@@ -17,6 +17,7 @@ struct BoardView<Header: View>: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var contactsDenied = false
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     var body: some View {
         ScrollView {
@@ -61,7 +62,9 @@ struct BoardView<Header: View>: View {
 
     @ViewBuilder
     private var grid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+        // The minimum card width grows with the text, so the grid drops to
+        // one column at the accessibility sizes instead of squeezing names.
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150 * TypeScale.clamp(scale)), spacing: 12)], spacing: 12) {
             ForEach(board.entries) { entry in
                 BoardCard(entry: entry)
             }
@@ -151,6 +154,11 @@ struct BoardView<Header: View>: View {
 private struct BoardCard: View {
     let entry: BoardEntry
 
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
+
+    private var avatarSize: CGFloat { 56 * TypeScale.clamp(scale) }
+    private var badgeSize: CGFloat { 26 * TypeScale.clamp(scale) }
+
     /// Tapping a friend starts a chat with them. sms: goes to the system's
     /// default messaging app (user-selectable since iOS 18.2), so this lands
     /// in whatever chat app the user actually uses for that person's number.
@@ -193,8 +201,8 @@ private struct BoardCard: View {
                     .shadow(color: ringTheme?.accent.opacity(0.5) ?? .clear, radius: 8)
                 if let emoji = entry.checkin?.emoji {
                     Text(emoji)
-                        .font(.system(size: 18))
-                        .frame(width: 26, height: 26)
+                        .font(.system(size: 18 * TypeScale.clamp(scale)))
+                        .frame(width: badgeSize, height: badgeSize)
                         .background(Circle().fill(Color(red: 0.13, green: 0.12, blue: 0.17)))
                         .offset(x: 5, y: 5)
                 }
@@ -202,6 +210,7 @@ private struct BoardCard: View {
             Text(entry.identity.name)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
             // Kept even when there's nothing to say: the grid sizes each
             // card to its own content, so dropping the line made checked-in
             // friends' cards visibly shorter than the rest.
@@ -227,13 +236,13 @@ private struct BoardCard: View {
             Image(uiImage: avatar.image)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 56, height: 56)
+                .frame(width: avatarSize, height: avatarSize)
                 .clipShape(Circle())
         } else {
             ZStack {
                 Circle()
                     .fill(.white.opacity(0.08))
-                    .frame(width: 56, height: 56)
+                    .frame(width: avatarSize, height: avatarSize)
                 Text(entry.identity.name.prefix(1).uppercased())
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)

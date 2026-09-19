@@ -14,6 +14,7 @@ struct OnboardingView: View {
 
     @State private var step: Step = .contacts
     @State private var isBusy = false
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
     @AppStorage(ReminderScheduler.configuredKey) private var reminderConfigured = false
     @AppStorage(ReminderScheduler.enabledKey) private var reminderEnabled = true
     @AppStorage(ReminderScheduler.windowStartKey) private var windowStart = ReminderScheduler.defaultWindowStart
@@ -66,7 +67,7 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: symbol)
-                .font(.system(size: 64))
+                .font(.system(size: 64 * TypeScale.clamp(scale)))
                 .foregroundStyle(.tint)
             Text(title)
                 .font(.title.weight(.semibold))

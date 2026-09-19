@@ -5,8 +5,10 @@ struct HistoryView: View {
     @State private var checkinsByDay: [String: Checkin] = [:]
     @State private var selected: Checkin?
     @State private var errorMessage: String?
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     private var calendar: Calendar { .current }
+    private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
 
     // Pushed from HomeView's toolbar, so it rides the home NavigationStack
     // rather than owning one.
@@ -14,8 +16,15 @@ struct HistoryView: View {
         ScrollView {
             VStack(spacing: 16) {
                 monthHeader
-                weekdayHeader
-                dayGrid
+                // Seven columns cannot hold accessibility-size digits: at
+                // the largest setting every two-digit day became "…". The
+                // grid follows the text size up to the last regular step
+                // and stops there; the cells still grow (TypeScale).
+                Group {
+                    weekdayHeader
+                    dayGrid
+                }
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red).font(.footnote)
                 }
@@ -105,7 +114,7 @@ struct HistoryView: View {
             // ForEach children, so blank ids overlapping day numbers (1...)
             // silently drop those day cells.
             ForEach(-leadingBlanks..<0, id: \.self) { _ in
-                Color.clear.frame(height: 40)
+                Color.clear.frame(height: cellHeight)
             }
             ForEach(1...daysInMonth, id: \.self) { day in
                 let checkin = checkinsByDay[LocalDay.string(for: date(day: day))]
@@ -134,9 +143,14 @@ struct HistoryView: View {
 }
 
 private struct DayCell: View {
+    /// Cell height at the default text size.
+    static let baseHeight: CGFloat = 40
+
     let day: Int
     let checkin: Checkin?
     let isToday: Bool
+
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     /// The day's mood colors — nil for days without a check-in, which stay
     /// a faint neutral so the month reads as a color story at arm's length.
@@ -181,21 +195,27 @@ private struct DayCell: View {
 private struct CheckinDetailSheet: View {
     let checkin: Checkin
 
+    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     private var theme: MoodTheme { MoodTheme.forEmoji(checkin.emoji) }
 
-    /// "Wednesday, August 19" instead of the stored "2026-08-19".
+    /// "Wednesday, August 19" instead of the stored "2026-08-19" — with the
+    /// month abbreviated at the accessibility sizes, where the sheet's
+    /// fixed height leaves the full form one truncated line.
     private var dateText: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         guard let date = formatter.date(from: checkin.day) else { return checkin.day }
-        return date.formatted(.dateTime.weekday(.wide).month(.wide).day())
+        let month: Date.FormatStyle.Symbol.Month = dynamicTypeSize.isAccessibilitySize ? .abbreviated : .wide
+        return date.formatted(.dateTime.weekday(.wide).month(month).day())
     }
 
     var body: some View {
         VStack(spacing: 16) {
             Text(checkin.emoji)
-                .font(.system(size: 44))
-                .frame(width: 84, height: 84)
+                .font(.system(size: 44 * TypeScale.clamp(scale)))
+                .frame(width: 84 * TypeScale.clamp(scale), height: 84 * TypeScale.clamp(scale))
                 .background(Circle().fill(.white.opacity(0.07)))
                 .overlay(Circle().strokeBorder(theme.accent, lineWidth: 3))
                 .shadow(color: theme.accent.opacity(0.55), radius: 12)
