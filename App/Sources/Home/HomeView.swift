@@ -72,8 +72,14 @@ struct HomeView: View {
                 }
             }
             .onChange(of: scenePhase) {
-                if scenePhase == .active, !isLoading, CheckinQueue.pending != nil {
+                guard scenePhase == .active, !isLoading else { return }
+                if CheckinQueue.pending != nil {
                     Task { await flushPending() }
+                } else {
+                    // A check-in made from the lock-screen widget while the
+                    // app sat in the background: the view is still mounted,
+                    // so .task won't run again — read today's row instead.
+                    Task { await adoptServerCheckin() }
                 }
             }
             .onAppear {
@@ -243,6 +249,25 @@ struct HomeView: View {
         Analytics.screen(selected == nil ? .home : .board)
     }
 
+    /// Picks up a check-in the server has that this screen doesn't — made
+    /// from the lock-screen widget while the app was backgrounded. Runs on
+    /// the save chain so it can't race a tap made just now, and only ever
+    /// moves the selection to what the server holds, never away from a
+    /// save still in flight.
+    private func adoptServerCheckin() async {
+        let previous = saveTask
+        let task = Task {
+            await previous?.value
+            guard let row = try? await CheckinRepository().today()?.emoji, row != confirmed else { return }
+            confirmed = row
+            if selected != row { withAnimation { selected = row } }
+            ReminderScheduler.cancelToday()
+            Analytics.screen(.board)
+        }
+        saveTask = task
+        await task.value
+    }
+
     /// Retries the parked check-in, if any, on the save chain so it can't
     /// race a fresh tap, and reflects the outcome on screen.
     @discardableResult
@@ -330,47 +355,5 @@ struct HomeView: View {
                 }
             }
         }
-    }
-}
-
-private struct EmojiButton: View {
-    let emoji: String
-    let isSelected: Bool
-    var isWildcard = false
-    /// Base sizes at the default text size; both follow Dynamic Type.
-    let diameter: CGFloat
-    let fontSize: CGFloat
-    let action: () -> Void
-
-    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
-
-    /// Each button rings and glows in its own mood's color, not a shared
-    /// accent — the ring wears the color it would turn.
-    private var theme: MoodTheme { MoodTheme.forEmoji(emoji) }
-
-    private var scaledDiameter: CGFloat { diameter * TypeScale.clamp(scale) }
-
-    var body: some View {
-        Button(action: action) {
-            Text(emoji)
-                .font(.system(size: fontSize * TypeScale.clamp(scale)))
-                .frame(width: scaledDiameter, height: scaledDiameter)
-                .background(Circle().fill(.white.opacity(isSelected ? 0.10 : 0.06)))
-                .overlay {
-                    if isSelected {
-                        Circle().strokeBorder(theme.accent, lineWidth: diameter > 60 ? 3 : 2.5)
-                    } else {
-                        // The daily wildcard keeps a dashed "surprise" ring.
-                        Circle().strokeBorder(
-                            .white.opacity(0.12),
-                            style: StrokeStyle(lineWidth: 1.5, dash: isWildcard ? [6, 5] : [])
-                        )
-                    }
-                }
-                .shadow(color: isSelected ? theme.accent.opacity(0.55) : .clear, radius: 10)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(emoji) mood")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
