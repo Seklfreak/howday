@@ -88,6 +88,12 @@ targets:
         SENTRY_DSN: $(SENTRY_DSN)
         UMAMI_URL: $(UMAMI_URL)
         UMAMI_WEBSITE_ID: $(UMAMI_WEBSITE_ID)
+        # What a widget tap opens: howday://open?source=… . Nothing else
+        # uses the scheme, and the app ignores a URL it can't read.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.winktech.moodring
+            CFBundleURLSchemes:
+              - howday
         NSContactsUsageDescription: >-
           Howday is contacts-based: friends are matched by hashed phone
           numbers, and their names and photos are shown straight from your
@@ -186,6 +192,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        # The widget reports its own events (which widgets are installed,
+        # a check-in made from the lock screen), and AppConfig/Umami read
+        # Bundle.main — which here is the appex, not the app.
+        UMAMI_URL: $(UMAMI_URL)
+        UMAMI_WEBSITE_ID: $(UMAMI_WEBSITE_ID)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 

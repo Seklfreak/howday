@@ -29,5 +29,9 @@
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>
+	<key>UMAMI_URL</key>
+	<string>$(UMAMI_URL)</string>
+	<key>UMAMI_WEBSITE_ID</key>
+	<string>$(UMAMI_WEBSITE_ID)</string>
 </dict>
 </plist>

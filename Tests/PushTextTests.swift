@@ -39,3 +39,24 @@ struct NameMapTests {
         #expect(NameMap.name(for: "def") == "Ben")
     }
 }
+
+/// The `source` values are what the dashboard groups by, and the URL is the
+/// only channel carrying them from a widget into the app — a typo either
+/// side silently loses the attribution rather than failing.
+struct WidgetSourceTests {
+    @Test func everySourceSurvivesTheRoundTrip() {
+        let all: [WidgetSource] = [.skySmall, .skyMedium, .skyLarge, .lockCircular, .lockRectangular, .control, .app]
+        for source in all {
+            let url = source.openURL
+            #expect(url != nil, "\(source.rawValue)")
+            #expect(WidgetSource.from(openURL: url!) == source, "\(source.rawValue)")
+        }
+    }
+
+    @Test func aForeignURLIsNotAnOpen() {
+        #expect(WidgetSource.from(openURL: URL(string: "https://example.com/open?source=sky-small")!) == nil)
+        #expect(WidgetSource.from(openURL: URL(string: "howday://other?source=sky-small")!) == nil)
+        #expect(WidgetSource.from(openURL: URL(string: "howday://open")!) == nil)
+        #expect(WidgetSource.from(openURL: URL(string: "howday://open?source=nonsense")!) == nil)
+    }
+}

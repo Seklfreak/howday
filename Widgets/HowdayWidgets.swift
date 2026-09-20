@@ -19,7 +19,7 @@ struct FriendsSkyWidget: Widget {
     static let kind = "FriendsSky"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: SkyProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: SkyProvider(kind: Self.kind)) { entry in
             SkyWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
                     SkyBackground(snapshot: entry.snapshot)
@@ -41,6 +41,11 @@ struct SkyEntry: TimelineEntry {
 }
 
 struct SkyProvider: TimelineProvider {
+    /// Which widget this provider serves. Only analytics needs it: both
+    /// widgets read the same board, but a census has to say which of them
+    /// a person actually has.
+    let kind: String
+
     func placeholder(in context: Context) -> SkyEntry {
         SkyEntry(date: .now, snapshot: .placeholder)
     }
@@ -67,6 +72,7 @@ struct SkyProvider: TimelineProvider {
         Task {
             let now = Date.now
             let snapshot = await SkyRepository.load()
+            await WidgetAnalytics.widgetActive(kind: kind, family: context.family)
             let midnight = Calendar.current.nextDate(
                 after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime
             ) ?? now.addingTimeInterval(30 * 60)
@@ -94,19 +100,26 @@ struct SkyWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        switch entry.snapshot.state {
-        case .signedOut:
-            message("Open Howday to sign in")
-        case .failed:
-            message("Couldn't reach Howday")
-        case .ready where entry.snapshot.friends.isEmpty:
-            message("No friends on Howday yet")
-        case .ready:
-            switch family {
-            case .systemLarge: LargeSky(snapshot: entry.snapshot, phase: entry.phase)
-            default: ScatteredSky(snapshot: entry.snapshot, phase: entry.phase, showsNames: family == .systemMedium)
+        Group {
+            switch entry.snapshot.state {
+            case .signedOut:
+                message("Open Howday to sign in")
+            case .failed:
+                message("Couldn't reach Howday")
+            case .ready where entry.snapshot.friends.isEmpty:
+                message("No friends on Howday yet")
+            case .ready:
+                switch family {
+                case .systemLarge:
+                    LargeSky(snapshot: entry.snapshot, phase: entry.phase)
+                default:
+                    ScatteredSky(snapshot: entry.snapshot, phase: entry.phase, showsNames: family == .systemMedium)
+                }
             }
         }
+        // What makes a tap attributable: without it the widget opens the
+        // app with nothing to say about where the person came from.
+        .widgetURL(family.source(kind: FriendsSkyWidget.kind).openURL)
     }
 
     private func message(_ text: String) -> some View {

@@ -249,6 +249,66 @@ struct HomeView: View {
         Analytics.screen(selected == nil ? .home : .board)
     }
 
+    /// Tapping an emoji IS the check-in — no separate confirm step, and no
+    /// waiting on the network: the selection moves immediately and the upsert
+    /// rides along behind it. Saves are chained so rapid taps reach the server
+    /// in the order they were made and the last tap is the one that sticks.
+    private func lockIn(_ choice: String) {
+        guard choice != selected else { return }
+        // Read from `selected`, not `confirmed`: it moves with the tap, so
+        // rapid taps before the first save lands can't both count as first.
+        let isFirstToday = selected == nil
+        withAnimation { selected = choice }
+        errorMessage = nil
+        notice = nil
+        // The board takes over the moment the first mood lands, not when the
+        // save comes back — record the screen the user is actually looking at.
+        if isFirstToday { Analytics.screen(.board) }
+
+        let previous = saveTask
+        saveTask = Task {
+            await previous?.value
+            do {
+                try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
+                confirmed = choice
+                // This tap reached the server, so anything parked before it
+                // is superseded — draining it later would resurrect an
+                // older choice over this one.
+                CheckinQueue.pending = nil
+                notice = nil
+                // The day's done; a reminder landing later would be noise.
+                ReminderScheduler.cancelToday()
+                // The widget's gate opens (or its emoji changes) with this.
+                WidgetCenter.shared.reloadAllTimelines()
+                // The emoji stays out of it — the mood is the private part.
+                Analytics.track(
+                    isFirstToday ? "checkin_saved" : "checkin_edited",
+                    ["source": WidgetSource.app.rawValue]
+                )
+            } catch where error.isTransientNetwork {
+                // No network: keep the choice on screen and park the save.
+                // Rolling back would read as the app refusing the mood, and
+                // the day would be lost unless the user came back to retry.
+                CheckinQueue.pending = .init(emoji: choice, day: LocalDay.string(), isEdit: !isFirstToday)
+                if selected == choice { notice = "Saving when you're back online." }
+                Analytics.track("checkin_queued")
+            } catch {
+                // A later tap that lands supersedes this failure; only roll
+                // back if this is still what the user is looking at.
+                if selected == choice {
+                    withAnimation { selected = confirmed }
+                    errorMessage = error.report("home.save")
+                }
+            }
+        }
+    }
+}
+
+/// The home screen's half of the check-in queue: adopting a check-in made
+/// elsewhere (the lock-screen widget) and retrying one parked by a dead
+/// network. An extension rather than more of the view — this is about the
+/// queue, not about what is on screen.
+extension HomeView {
     /// Picks up a check-in the server has that this screen doesn't — made
     /// from the lock-screen widget while the app was backgrounded. Runs on
     /// the save chain so it can't race a tap made just now, and only ever
@@ -287,7 +347,10 @@ struct HomeView: View {
                 WidgetCenter.shared.reloadAllTimelines()
                 // Same events as a direct save: the funnel counts the
                 // check-in once, when it actually reaches the server.
-                Analytics.track(entry.isEdit ? "checkin_edited" : "checkin_saved")
+                Analytics.track(
+                    entry.isEdit ? "checkin_edited" : "checkin_saved",
+                    ["source": WidgetSource.app.rawValue]
+                )
             case .stillPending:
                 notice = "Saving when you're back online."
             case .expired:
@@ -304,56 +367,5 @@ struct HomeView: View {
         }
         saveTask = Task { _ = await task.value }
         return await task.value
-    }
-
-    /// Tapping an emoji IS the check-in — no separate confirm step, and no
-    /// waiting on the network: the selection moves immediately and the upsert
-    /// rides along behind it. Saves are chained so rapid taps reach the server
-    /// in the order they were made and the last tap is the one that sticks.
-    private func lockIn(_ choice: String) {
-        guard choice != selected else { return }
-        // Read from `selected`, not `confirmed`: it moves with the tap, so
-        // rapid taps before the first save lands can't both count as first.
-        let isFirstToday = selected == nil
-        withAnimation { selected = choice }
-        errorMessage = nil
-        notice = nil
-        // The board takes over the moment the first mood lands, not when the
-        // save comes back — record the screen the user is actually looking at.
-        if isFirstToday { Analytics.screen(.board) }
-
-        let previous = saveTask
-        saveTask = Task {
-            await previous?.value
-            do {
-                try await withSkewRetry { try await CheckinRepository().saveToday(emoji: choice) }
-                confirmed = choice
-                // This tap reached the server, so anything parked before it
-                // is superseded — draining it later would resurrect an
-                // older choice over this one.
-                CheckinQueue.pending = nil
-                notice = nil
-                // The day's done; a reminder landing later would be noise.
-                ReminderScheduler.cancelToday()
-                // The widget's gate opens (or its emoji changes) with this.
-                WidgetCenter.shared.reloadAllTimelines()
-                // The emoji stays out of it — the mood is the private part.
-                Analytics.track(isFirstToday ? "checkin_saved" : "checkin_edited")
-            } catch where error.isTransientNetwork {
-                // No network: keep the choice on screen and park the save.
-                // Rolling back would read as the app refusing the mood, and
-                // the day would be lost unless the user came back to retry.
-                CheckinQueue.pending = .init(emoji: choice, day: LocalDay.string(), isEdit: !isFirstToday)
-                if selected == choice { notice = "Saving when you're back online." }
-                Analytics.track("checkin_queued")
-            } catch {
-                // A later tap that lands supersedes this failure; only roll
-                // back if this is still what the user is looking at.
-                if selected == choice {
-                    withAnimation { selected = confirmed }
-                    errorMessage = error.report("home.save")
-                }
-            }
-        }
     }
 }

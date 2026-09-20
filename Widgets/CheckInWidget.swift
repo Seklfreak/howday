@@ -10,7 +10,7 @@ struct CheckInWidget: Widget {
     static let kind = "CheckIn"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: SkyProvider()) { entry in
+        StaticConfiguration(kind: Self.kind, provider: SkyProvider(kind: Self.kind)) { entry in
             CheckInWidgetView(entry: entry)
                 .containerBackground(for: .widget) { AccessoryWidgetBackground() }
         }
@@ -26,10 +26,15 @@ struct CheckInWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        switch family {
-        case .accessoryCircular: CircularRing(snapshot: entry.snapshot, at: entry.date)
-        default: RectangularStrip(snapshot: entry.snapshot)
+        Group {
+            switch family {
+            case .accessoryCircular: CircularRing(snapshot: entry.snapshot, at: entry.date)
+            default: RectangularStrip(snapshot: entry.snapshot)
+            }
         }
+        // The picker's buttons take their own taps; this catches the rest
+        // of the widget, and every tap on the friends strip.
+        .widgetURL(family.source(kind: CheckInWidget.kind).openURL)
     }
 }
 

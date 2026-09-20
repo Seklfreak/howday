@@ -39,18 +39,13 @@ enum Analytics {
         }
     }
 
-    /// The domain the site is registered under in Umami. Not a real host — it
-    /// just keeps app traffic apart from the websites on the same instance.
-    /// Matches the domain the site is declared with in winkcloud. Renaming
-    /// it does not move any data — events are filed by website id — it only
-    /// means reports show two hostnames across the rename.
-    private static let hostname = "howday.ios"
     /// A long offline stretch drops the oldest events rather than growing.
     private static let queueLimit = 50
 
-    private static var endpoint: URL?
-    private static var websiteID = ""
-    private static var userAgent = ""
+    /// Endpoint, website id and user agent; nil until `configure`, which is
+    /// also what makes every call below a no-op. Shared with the widget
+    /// extension (see `Shared/Umami.swift`) so both report as one visitor.
+    private static var config: Umami.Config?
     private static var currentPath = "/"
     private static var currentTitle = ""
     /// SwiftUI calls `onAppear` more than once on a NavigationStack root when
@@ -62,26 +57,11 @@ enum Analytics {
     private static var isSending = false
     private static var cachedScreenSize: String?
 
-    /// Random per install, kept so returning visitors are countable, and gone
-    /// with the app. A UUID string is well inside Umami's 50-character limit.
-    private static let visitorID: String = {
-        let key = "analytics.visitorId"
-        if let existing = UserDefaults.standard.string(forKey: key) { return existing }
-        let fresh = UUID().uuidString
-        UserDefaults.standard.set(fresh, forKey: key)
-        return fresh
-    }()
-
     /// A no-op unless both values are configured — CI and simulator builds run
     /// from the placeholder xcconfig, exactly as they do for Sentry's DSN.
     static func configure() {
-        guard let raw = Bundle.main.object(forInfoDictionaryKey: "UMAMI_URL") as? String,
-              let base = URL(string: raw), base.host != nil,
-              let website = Bundle.main.object(forInfoDictionaryKey: "UMAMI_WEBSITE_ID") as? String,
-              !website.isEmpty else { return }
-        endpoint = base.appendingPathComponent("api/send")
-        websiteID = website
-        userAgent = browserUserAgent()
+        guard let resolved = Umami.config() else { return }
+        config = resolved
         // Anything stranded by a dead network gets another chance on return.
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
@@ -111,20 +91,11 @@ enum Analytics {
     }
 
     private static func queue(name: String?, data: [String: String]) {
-        guard endpoint != nil else { return }
-        var payload: [String: Any] = [
-            "website": websiteID,
-            "hostname": hostname,
-            "url": currentPath,
-            "title": currentTitle,
-            "language": Locale.preferredLanguages.first ?? "en-US",
-            "screen": screenSize,
-            "id": visitorID,
-        ]
-        // An event without a name is what Umami stores as a pageview.
-        if let name { payload["name"] = name }
-        if !data.isEmpty { payload["data"] = data }
-
+        guard let config else { return }
+        rememberScreenSize()
+        let payload = Umami.payload(
+            config: config, path: currentPath, title: currentTitle, name: name, data: data
+        )
         pending.append(payload)
         if pending.count > queueLimit { pending.removeFirst(pending.count - queueLimit) }
         send()
@@ -133,49 +104,30 @@ enum Analytics {
     /// Drains the queue one event at a time, in order; a failure leaves the
     /// event in place for the next event or the next foreground to retry.
     private static func send() {
-        guard let endpoint, !isSending, let next = pending.first else { return }
-        guard let body = try? JSONSerialization.data(withJSONObject: ["type": "event", "payload": next]) else {
+        guard let config, !isSending, let next = pending.first else { return }
+        isSending = true
+        Task { @MainActor in
+            let accepted = await Umami.post(next, config: config)
+            isSending = false
+            guard accepted, !pending.isEmpty else { return }
             pending.removeFirst()
             send()
-            return
         }
-        isSending = true
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.httpBody = body
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            let accepted = error == nil && ((response as? HTTPURLResponse)?.statusCode ?? 500) < 400
-            Task { @MainActor in
-                isSending = false
-                guard accepted, !pending.isEmpty else { return }
-                pending.removeFirst()
-                send()
-            }
-        }.resume()
     }
 
-    /// Umami rejects a request with no User-Agent outright, and answers one
-    /// its bot filter matches with a 200 that stores nothing — so this has to
-    /// read as a browser. It is also where Umami reads the OS and device from.
-    private static func browserUserAgent() -> String {
-        let os = UIDevice.current.systemVersion.replacingOccurrences(of: ".", with: "_")
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        return "Mozilla/5.0 (iPhone; CPU iPhone OS \(os) like Mac OS X) "
-            + "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Howday/\(version)"
-    }
-
-    /// Points, mirroring the CSS pixels the web tracker reports. Read lazily:
-    /// at app init there is no window scene to measure yet.
-    private static var screenSize: String {
-        if let cachedScreenSize { return cachedScreenSize }
+    /// Points, mirroring the CSS pixels the web tracker reports. Measured
+    /// lazily and only once it is real: at app init there is no window scene
+    /// yet, and writing the 0x0 that reads back would hand the extensions —
+    /// which have no window of their own and take this value from the App
+    /// Group — a device size that never existed.
+    private static func rememberScreenSize() {
+        guard cachedScreenSize == nil else { return }
         let size = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.bounds.size }
             .first ?? .zero
+        guard size != .zero else { return }
         let value = "\(Int(size.width))x\(Int(size.height))"
-        if size != .zero { cachedScreenSize = value }
-        return value
+        cachedScreenSize = value
+        Umami.screenSize = value
     }
 }

@@ -267,7 +267,7 @@ and window-geometry guessing; AXe needs neither.
 
 ## Analytics (Umami)
 
-- `Core/Umami.swift` talks to Umami's `/api/send` directly — the same JSON the
+- `Core/Analytics.swift` talks to Umami's `/api/send` directly — the same JSON the
   web tracker posts. Two things about that endpoint bite:
   **a request with no `User-Agent` is rejected**, and one whose UA trips
   Umami's bot filter gets a **`200` that stores nothing**. `browserUserAgent()`
@@ -294,6 +294,26 @@ and window-geometry guessing; AXe needs neither.
   given, so anything that changes what's on screen without an `onAppear` has
   to say so. Dismissing a sheet is the one that bites: `HomeView` reports the
   board again when Settings closes, or taps get attributed to `/settings`.
+- **The widgets report too, and share the app's identity.** `Shared/Umami.swift`
+  holds the visitor id, the payload shape and the POST; `Core/Analytics.swift`
+  adds the app's queue and screen state, `Widgets/WidgetAnalytics.swift`
+  fires one awaited event (a widget process dies too soon for a queue).
+  The visitor id lives in the **App Group**, not `UserDefaults.standard`,
+  or every widget user would count as a second person; an install from
+  before that adopts its old id rather than minting a new one. The app
+  publishes its measured screen size there too — an extension has no
+  window and would report `0x0`.
+- Widget events: `widget_opened` (a tap, via `howday://open?source=…` on
+  `widgetURL` and the Control Center tile's `OpenURLIntent`), `widget_active`
+  (**the denominator** — which widgets are installed, at most once a day per
+  widget and size, throttled in the App Group), and `checkin_saved` from the
+  lock-screen picker. Every one carries a `source` from `WidgetSource`, and
+  the app's own check-ins carry `source: app` so the two are comparable.
+  Those raw values are schema: change one and the reports split at that date.
+- The widget target needs `UMAMI_URL` / `UMAMI_WEBSITE_ID` in **its own**
+  Info.plist — `Umami.config()` reads `Bundle.main`, which in an extension
+  is the appex. Same for the `#if !DEBUG` rule below: a Release build is
+  the only thing that compiles `WidgetAnalytics`.
 - Adding `payload.id` made the app touch `UserDefaults`, a required-reason API,
   so `App/PrivacyInfo.xcprivacy` declares `CA92.1`. Keep it in the target's
   `sources` in `project.yml` — it must land at the `.app` root. The reasons key is

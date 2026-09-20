@@ -37,6 +37,12 @@ struct CheckInIntent: AppIntent {
             .upsert(payload, onConflict: "user_id,day", returning: .minimal)
             .execute()
         WidgetCenter.shared.reloadAllTimelines()
+        // Counted the same way the app counts its own, so the two are
+        // comparable; the emoji stays out of it, as everywhere else.
+        await WidgetAnalytics.track(
+            "checkin_saved", ["source": WidgetSource.lockRectangular.rawValue],
+            path: "/widget/\(WidgetSource.lockRectangular.rawValue)", title: "Widget"
+        )
         return .result()
     }
 }

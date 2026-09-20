@@ -35,6 +35,13 @@ struct HowdayApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                // A widget hands the app the source it was tapped from;
+                // nothing else uses the scheme, so an unknown URL is
+                // simply ignored rather than routed.
+                .onOpenURL { url in
+                    guard let source = WidgetSource.from(openURL: url) else { return }
+                    Analytics.track("widget_opened", ["source": source.rawValue])
+                }
         }
     }
 }
