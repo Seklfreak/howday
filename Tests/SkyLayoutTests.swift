@@ -76,6 +76,29 @@ struct SkyLayoutTests {
         #expect(byName["Jonas"]! < byName["Chloé"]!)
     }
 
+    @Test func driftMovesEachStepALittleAndStaysInside() {
+        let before = SkyLayout.scattered(friends, in: small, day: "2026-09-19", phase: 100, inset: 10)
+        let after = SkyLayout.scattered(friends, in: small, day: "2026-09-19", phase: 101, inset: 10)
+        var moved = false
+        for (one, next) in zip(before.placements, after.placements) {
+            let dx = abs(one.center.x - next.center.x)
+            let dy = abs(one.center.y - next.center.y)
+            #expect(dx <= 2 * SkyLayout.driftAmplitude && dy <= 2 * SkyLayout.driftAmplitude, "\(one.friend.name)")
+            if dx + dy > 0.5 { moved = true }
+            let r = next.diameter / 2
+            #expect(next.center.x - r >= 0 && next.center.x + r <= small.width, "\(next.friend.name)")
+            #expect(next.center.y - r >= 0 && next.center.y + r <= small.height, "\(next.friend.name)")
+        }
+        #expect(moved)
+    }
+
+    @Test func phaseIsAFiveMinuteStep() {
+        // 999,900 is a whole number of five-minute steps since the epoch.
+        let date = Date(timeIntervalSince1970: 999_900)
+        #expect(SkyLayout.phase(at: date.addingTimeInterval(299)) == SkyLayout.phase(at: date))
+        #expect(SkyLayout.phase(at: date.addingTimeInterval(300)) == SkyLayout.phase(at: date) + 1)
+    }
+
     @Test func seededGeneratorIsStable() {
         var one = SeededGenerator(seed: "2026-09-19")
         var two = SeededGenerator(seed: "2026-09-19")

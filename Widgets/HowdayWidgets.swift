@@ -31,6 +31,9 @@ struct FriendsSkyWidget: Widget {
 struct SkyEntry: TimelineEntry {
     let date: Date
     let snapshot: SkySnapshot
+
+    /// The drift step this entry shows; see `SkyLayout.phase(at:)`.
+    var phase: Int { SkyLayout.phase(at: date) }
 }
 
 struct SkyProvider: TimelineProvider {
@@ -46,18 +49,32 @@ struct SkyProvider: TimelineProvider {
         Task { completion(SkyEntry(date: .now, snapshot: await SkyRepository.load())) }
     }
 
-    /// One entry, refreshed every half hour or at midnight, whichever is
-    /// first — the app and the notification extension reload the timeline
-    /// on top of that whenever something actually changes.
+    /// One board read, shown as an entry every five minutes for the next
+    /// half hour: the same snapshot, the emoji drifted a little further
+    /// each step (WidgetKit animates the change between entries, which is
+    /// as close to floating as a widget gets). The timeline then rebuilds
+    /// with a fresh read — or at midnight, when the day and its sky
+    /// change. The app and the notification extension reload it on top of
+    /// that whenever something actually changes.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SkyEntry>) -> Void) {
         Task {
             let now = Date.now
             let snapshot = await SkyRepository.load()
-            let halfHour = now.addingTimeInterval(30 * 60)
             let midnight = Calendar.current.nextDate(
                 after: now, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime
-            ) ?? halfHour
-            completion(Timeline(entries: [SkyEntry(date: now, snapshot: snapshot)], policy: .after(min(halfHour, midnight))))
+            ) ?? now.addingTimeInterval(30 * 60)
+            // Entries land on step boundaries so a rebuild at any moment
+            // continues the same drift; the first one is "now".
+            let step: TimeInterval = 300
+            let firstBoundary = (now.timeIntervalSince1970 / step).rounded(.up) * step
+            var dates = [now]
+            var next = Date(timeIntervalSince1970: firstBoundary)
+            while next < min(now.addingTimeInterval(30 * 60), midnight) {
+                dates.append(next)
+                next = next.addingTimeInterval(step)
+            }
+            let entries = dates.map { SkyEntry(date: $0, snapshot: snapshot) }
+            completion(Timeline(entries: entries, policy: .atEnd))
         }
     }
 }
@@ -79,8 +96,8 @@ struct SkyWidgetView: View {
             message("No friends on Howday yet")
         case .ready:
             switch family {
-            case .systemLarge: LargeSky(snapshot: entry.snapshot)
-            default: ScatteredSky(snapshot: entry.snapshot, showsNames: family == .systemMedium)
+            case .systemLarge: LargeSky(snapshot: entry.snapshot, phase: entry.phase)
+            default: ScatteredSky(snapshot: entry.snapshot, phase: entry.phase, showsNames: family == .systemMedium)
             }
         }
     }
@@ -98,6 +115,7 @@ struct SkyWidgetView: View {
 /// emoji become question marks and a caption says why.
 private struct ScatteredSky: View {
     let snapshot: SkySnapshot
+    let phase: Int
     let showsNames: Bool
 
     private var locked: Bool { snapshot.mine == nil }
@@ -105,7 +123,7 @@ private struct ScatteredSky: View {
     var body: some View {
         GeometryReader { proxy in
             let layout = SkyLayout.scattered(
-                snapshot.friends, in: proxy.size, day: snapshot.day,
+                snapshot.friends, in: proxy.size, day: snapshot.day, phase: phase,
                 inset: 10, topInset: showsNames ? 2 : 0, bottomInset: locked ? 30 : (showsNames ? 12 : 0),
                 labelAllowance: showsNames && !locked ? 12 : 0
             )
@@ -128,6 +146,8 @@ private struct ScatteredSky: View {
                     .frame(maxWidth: .infinity)
                 }
             }
+            // The glide from one step's positions to the next.
+            .animation(.easeInOut(duration: 1.5), value: phase)
         }
     }
 }
@@ -135,6 +155,7 @@ private struct ScatteredSky: View {
 /// The large widget: the day's sky, morning on the left.
 private struct LargeSky: View {
     let snapshot: SkySnapshot
+    let phase: Int
 
     private var locked: Bool { snapshot.mine == nil }
 
@@ -166,7 +187,7 @@ private struct LargeSky: View {
             .padding(.top, 14)
             GeometryReader { proxy in
                 let layout = SkyLayout.byTime(
-                    snapshot.friends, in: proxy.size, day: snapshot.day, topInset: 8, bottomInset: 8,
+                    snapshot.friends, in: proxy.size, day: snapshot.day, phase: phase, topInset: 8, bottomInset: 8,
                     labelAllowance: locked ? 0 : 12
                 )
                 ZStack {
@@ -183,6 +204,7 @@ private struct LargeSky: View {
                             .background(.white.opacity(0.1), in: Capsule())
                     }
                 }
+                .animation(.easeInOut(duration: 1.5), value: phase)
             }
             VStack(spacing: 5) {
                 Rectangle().fill(.white.opacity(0.14)).frame(height: 1)

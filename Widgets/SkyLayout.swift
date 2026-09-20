@@ -35,8 +35,19 @@ struct SkyLayout {
     /// Scattered, non-overlapping, newest biggest — the small and medium
     /// widgets. `inset` keeps the glow off the widget's edge; `topInset`
     /// and `bottomInset` leave room for a header or a caption.
+    /// How far a step of drift moves an emoji, in points. Small enough that
+    /// the clearance the placement left keeps neighbours apart.
+    static let driftAmplitude: CGFloat = 6
+
+    /// Which five-minute step of the day a date falls in. The drift is a
+    /// function of this, so a timeline rebuilt at any moment shows the sky
+    /// exactly where the previous one would have.
+    static func phase(at date: Date) -> Int {
+        Int(date.timeIntervalSince1970 / 300)
+    }
+
     static func scattered(
-        _ friends: [SkyFriend], in size: CGSize, day: String,
+        _ friends: [SkyFriend], in size: CGSize, day: String, phase: Int = 0,
         inset: CGFloat = 8, topInset: CGFloat = 0, bottomInset: CGFloat = 0, labelAllowance: CGFloat = 0
     ) -> SkyLayout {
         var generator = SeededGenerator(seed: day + "\(Int(size.width))x\(Int(size.height))")
@@ -68,13 +79,13 @@ struct SkyLayout {
             }
             placed.append(Placement(friend: friend, center: best, diameter: diameter))
         }
-        return SkyLayout(placements: placed)
+        return SkyLayout(placements: drifted(placed, phase: phase, day: day, in: size))
     }
 
     /// The day's sky — the large widget: x is the time of the check-in from
     /// morning (left) to evening (right), y is dealt, sizes as above.
     static func byTime(
-        _ friends: [SkyFriend], in size: CGSize, day: String,
+        _ friends: [SkyFriend], in size: CGSize, day: String, phase: Int = 0,
         inset: CGFloat = 12, topInset: CGFloat, bottomInset: CGFloat, labelAllowance: CGFloat = 0
     ) -> SkyLayout {
         var generator = SeededGenerator(seed: day + "large")
@@ -112,7 +123,29 @@ struct SkyLayout {
             }
             placed.append(Placement(friend: friend, center: best, diameter: diameter))
         }
-        return SkyLayout(placements: placed)
+        return SkyLayout(placements: drifted(placed, phase: phase, day: day, in: size))
+    }
+
+    /// The slow drift: each emoji wanders on its own small ellipse around
+    /// its dealt spot, a few points per step, never past the widget's edge.
+    /// Every friend gets their own speed and starting angle from the seed,
+    /// so the sky breathes rather than swaying as one.
+    private static func drifted(_ placements: [Placement], phase: Int, day: String, in size: CGSize) -> [Placement] {
+        placements.map { placement in
+            var generator = SeededGenerator(seed: day + placement.friend.id.uuidString)
+            let speedX = Double.random(in: 0.35...0.9, using: &generator)
+            let speedY = Double.random(in: 0.35...0.9, using: &generator)
+            let startX = Double.random(in: 0...(2 * .pi), using: &generator)
+            let startY = Double.random(in: 0...(2 * .pi), using: &generator)
+            let dx = driftAmplitude * CGFloat(sin(Double(phase) * speedX + startX))
+            let dy = driftAmplitude * CGFloat(cos(Double(phase) * speedY + startY))
+            let radius = placement.diameter / 2
+            let center = CGPoint(
+                x: min(max(placement.center.x + dx, radius), size.width - radius),
+                y: min(max(placement.center.y + dy, radius), size.height - radius)
+            )
+            return Placement(friend: placement.friend, center: center, diameter: placement.diameter)
+        }
     }
 }
 
