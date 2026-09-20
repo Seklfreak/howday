@@ -6,6 +6,10 @@ struct HistoryView: View {
     @State private var selected: Checkin?
     @State private var errorMessage: String?
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
+    /// Which way the grid should slide. Set before the month changes so the
+    /// transition matches the direction of travel rather than always
+    /// arriving from the same side.
+    @State private var slideForward = true
 
     private var calendar: Calendar { .current }
     private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
@@ -23,6 +27,15 @@ struct HistoryView: View {
                 Group {
                     weekdayHeader
                     dayGrid
+                        .id(monthKey)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: slideForward ? .trailing : .leading),
+                            removal: .move(edge: slideForward ? .leading : .trailing)
+                        ))
+                        // The outgoing and incoming months overlap mid-slide;
+                        // without this they paint over the header and the
+                        // screen's edges.
+                        .clipped()
                 }
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 if let errorMessage {
@@ -36,6 +49,19 @@ struct HistoryView: View {
             // the color, the backdrop stays the unworn ring.
             MoodBackground(theme: .neutral)
         }
+        // Swipe to flip through months, the way a calendar does. Simultaneous
+        // rather than exclusive: the scroll view still owns vertical drags,
+        // which is why this only acts on a clearly horizontal one. The
+        // chevrons stay — a gesture is not discoverable, and VoiceOver has
+        // no way to perform this one.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { drag in
+                    guard abs(drag.translation.width) > abs(drag.translation.height) else { return }
+                    step(months: drag.translation.width < 0 ? 1 : -1)
+                }
+        )
+        .sensoryFeedback(.selection, trigger: monthKey)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("History")
         .onAppear { Analytics.screen(.history) }
@@ -74,22 +100,36 @@ struct HistoryView: View {
 
     // MARK: subviews
 
+    /// Moves by whole months, and is the only way the month changes — the
+    /// chevrons and the swipe share it so both animate the same way and
+    /// both stop at the current month. There is nothing to show ahead of
+    /// today, and a forward swipe into an empty grid reads as a bug.
+    private func step(months: Int) {
+        guard months < 0 || !isCurrentMonth,
+              let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else { return }
+        slideForward = months > 0
+        withAnimation(.easeInOut(duration: 0.25)) { monthAnchor = moved }
+    }
+
     private var monthHeader: some View {
         HStack {
             Button {
-                monthAnchor = calendar.date(byAdding: .month, value: -1, to: monthAnchor) ?? monthAnchor
+                step(months: -1)
             } label: {
                 Image(systemName: "chevron.left")
             }
+            .accessibilityLabel("Previous month")
             Spacer()
             Text(monthStart.formatted(.dateTime.month(.wide).year()))
                 .font(.headline)
+                .contentTransition(.numericText())
             Spacer()
             Button {
-                monthAnchor = calendar.date(byAdding: .month, value: 1, to: monthAnchor) ?? monthAnchor
+                step(months: 1)
             } label: {
                 Image(systemName: "chevron.right")
             }
+            .accessibilityLabel("Next month")
             .disabled(isCurrentMonth)
         }
         .padding(.horizontal, 4)
