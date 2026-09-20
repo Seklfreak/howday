@@ -20,6 +20,9 @@ struct SkySnapshot: Hashable, Sendable {
     /// The day's sixth offer for the lock-screen picker; nil when there is
     /// no user to derive it from.
     var wildcard: String?
+    /// When the board was read. Shown on the large widget so a stale sky
+    /// can be told from a quiet day.
+    var fetchedAt: Date = .now
 
     var friendsIn: Int { friends.filter(\.isIn).count }
 

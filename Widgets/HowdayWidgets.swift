@@ -169,11 +169,19 @@ private struct LargeSky: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center) {
-                Text("\(Date.now.formatted(.dateTime.weekday(.wide))) · \(snapshot.friendsIn) of \(snapshot.friends.count) friends in")
+                // "Updated 12:03" is diagnostic: it says when the widget last
+                // read the board, which is the only way to tell a stale sky
+                // from a quiet day.
+                Text(
+                    "\(Date.now.formatted(.dateTime.weekday(.wide))) · \(snapshot.friendsIn) of \(snapshot.friends.count) friends in"
+                        + " · updated \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))"
+                )
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .textCase(.uppercase)
                     .tracking(0.6)
                     .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer()
                 if let mine = snapshot.mine {
                     HStack(spacing: 4) {
