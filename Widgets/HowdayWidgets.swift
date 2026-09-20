@@ -150,7 +150,12 @@ private struct LargeSky: View {
                 if let mine = snapshot.mine {
                     HStack(spacing: 4) {
                         Text(mine).font(.system(size: 14))
-                        Text("You").font(.system(size: 10, weight: .bold, design: .rounded))
+                        Text("You")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            // Explicit: a widget's default text colour follows
+                            // the home screen's rendering, which made this
+                            // black on the dark sky.
+                            .foregroundStyle(.white)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -216,7 +221,7 @@ private struct FriendMark: View {
                         )))
                 } else {
                     Text(emoji)
-                        .font(.system(size: placement.diameter * 0.72))
+                        .font(.system(size: placement.diameter * 0.84))
                         .frame(width: placement.diameter, height: placement.diameter)
                         .background(Circle().fill(RadialGradient(
                             colors: [theme.accent.opacity(0.25), .clear],

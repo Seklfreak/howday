@@ -13,11 +13,19 @@ struct SkyLayout {
 
     let placements: [Placement]
 
-    /// Emoji diameters by recency rank, in points, per widget width class.
-    private static func ladder(for size: CGSize) -> [CGFloat] {
-        if size.height >= 300 { return [66, 52, 46, 40, 36, 32, 28, 26] }
-        if size.width > 250 { return [58, 46, 40, 34, 30, 26, 24] }
-        return [46, 36, 30, 26, 24, 22]
+    /// Emoji diameters by recency rank, in points, per widget size class.
+    /// A sky with only a few friends gets bigger emoji still: four small
+    /// faces in a large widget read as lost, not as a quiet day.
+    private static func ladder(for size: CGSize, count: Int) -> [CGFloat] {
+        let base: [CGFloat] = if size.height >= 300 {
+            [80, 64, 56, 50, 46, 42, 38, 34]
+        } else if size.width > 250 {
+            [64, 52, 46, 40, 36, 32, 30]
+        } else {
+            [56, 44, 38, 34, 30, 28]
+        }
+        let boost: CGFloat = count <= 3 ? 1.3 : (count <= 5 ? 1.15 : 1)
+        return base.map { $0 * boost }
     }
 
     private static func ringDiameter(for size: CGSize) -> CGFloat {
@@ -32,7 +40,7 @@ struct SkyLayout {
         inset: CGFloat = 8, topInset: CGFloat = 0, bottomInset: CGFloat = 0, labelAllowance: CGFloat = 0
     ) -> SkyLayout {
         var generator = SeededGenerator(seed: day + "\(Int(size.width))x\(Int(size.height))")
-        let ladder = ladder(for: size)
+        let ladder = ladder(for: size, count: friends.count)
         let ring = ringDiameter(for: size)
         var placed: [Placement] = []
         for (index, friend) in friends.enumerated() {
@@ -70,7 +78,7 @@ struct SkyLayout {
         inset: CGFloat = 12, topInset: CGFloat, bottomInset: CGFloat, labelAllowance: CGFloat = 0
     ) -> SkyLayout {
         var generator = SeededGenerator(seed: day + "large")
-        let ladder = ladder(for: size)
+        let ladder = ladder(for: size, count: friends.count)
         let ring = ringDiameter(for: size)
         let calendar = Calendar.current
         var placed: [Placement] = []
