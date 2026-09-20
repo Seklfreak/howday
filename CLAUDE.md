@@ -210,11 +210,46 @@ and window-geometry guessing; AXe needs neither.
   profiles went through the API. Two profiles ship: `Moodring App Store` for the
   app and `Howday Notifications App Store` for the extension, as the
   `APP_STORE_PROFILE` / `APP_STORE_PROFILE_NOTIFICATIONS` secrets.
-  Changing capabilities on an App ID invalidates its profile: delete and
-  recreate through the API, then update the secret.
+  The widget ships as a third: `Howday Widgets App Store` /
+  `APP_STORE_PROFILE_WIDGETS`. Changing capabilities on an App ID
+  invalidates its profile: delete and recreate through the API, then
+  update the secret.
 - The extension's `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` must
   equal the app's or App Store Connect rejects the upload; CI passes both
   on the `xcodebuild` command line, which reaches every target.
+
+## Widgets (WidgetKit extension)
+
+- `Widgets/` is `HowdayWidgets` (`dev.winktech.moodring.widgets`), one
+  widget kind `FriendsSky` in small/medium/large: the friends' emoji
+  afloat, sized by recency, named from the App Group `names.json`; the
+  large one places them by check-in time (`board_today` now returns
+  `checked_in_at` for this). Display only — nothing is written from it.
+- **The widget reads the app's Supabase session straight from the
+  keychain.** Its entitlements list the app's own keychain group
+  (`$(AppIdentifierPrefix)dev.winktech.moodring`) *first*, so a default
+  `KeychainLocalStorage` finds the app's items and a token refresh made by
+  the widget lands where the app looks. No Keychain Sharing capability is
+  needed on the App ID for that — every profile already allows the team's
+  groups. Both processes may refresh the same token; Supabase's reuse
+  window covers the race, but if sign-outs ever cluster around widget
+  refreshes, that is the first suspect.
+- The widget's Info.plist needs `SUPABASE_URL` / `SUPABASE_ANON_KEY` of
+  its own (`AppConfig` reads `Bundle.main`, which is the appex bundle); the
+  TestFlight archive's command-line settings reach every target, so the
+  same secrets populate it.
+- Timeline: one entry, `.after(min(30 min, midnight))`; the app reloads all
+  timelines after a check-in save/drain and after every board fetch, and
+  the notification extension does after every friend push, so the widget
+  is usually fresher than its own schedule.
+- `SkyLayout` is deterministic (SplitMix64 seeded by day and size) so a
+  refresh never reshuffles the sky within a day. It is compiled into the
+  test target directly (`Widgets/SkyFriend.swift`, `SkyLayout.swift`): an
+  app-hosted test bundle can't `@testable import` an extension module.
+- The simulator can add the widget (long-press home → Edit → Add Widget →
+  search Howday, driven with AXe) and runs the real timeline with the
+  app's session — emoji render as "?" boxes there, like everywhere in the
+  iOS 26 simulator. Gallery previews show `SkySnapshot.placeholder`.
 
 ## Analytics (Umami)
 

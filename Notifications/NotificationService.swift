@@ -1,5 +1,6 @@
 import OSLog
 import UserNotifications
+import WidgetKit
 
 /// Rewrites a friend push's generic body into a named one. The payload's
 /// `sender_hash` is looked up in the name map the app maintains in the App
@@ -34,6 +35,9 @@ final class NotificationService: UNNotificationServiceExtension {
         } else {
             Self.log.info("no sender hash in payload; generic body kept")
         }
+        // A friend's check-in is exactly what the widget shows: refresh it
+        // now rather than at the next half-hour tick.
+        WidgetCenter.shared.reloadAllTimelines()
         contentHandler(content)
     }
 

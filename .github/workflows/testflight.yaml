@@ -17,6 +17,7 @@ name: TestFlight
 #   APPLE_DIST_CERT_PASSWORD                          - the .p12 export password
 #   APP_STORE_PROFILE                                 - base64 of the app's App Store .mobileprovision
 #   APP_STORE_PROFILE_NOTIFICATIONS                   - same, for the notification extension
+#   APP_STORE_PROFILE_WIDGETS                         - same, for the widget extension
 #   SUPABASE_URL / SUPABASE_ANON_KEY                  - baked into the shipped app
 #   SENTRY_DSN                                        - baked into the shipped app (crash reporting)
 #   UMAMI_URL / UMAMI_WEBSITE_ID                      - baked into the shipped app (analytics);
@@ -84,6 +85,7 @@ jobs:
           CERT_PW: ${{ secrets.APPLE_DIST_CERT_PASSWORD }}
           PROFILE_B64: ${{ secrets.APP_STORE_PROFILE }}
           PROFILE_EXT_B64: ${{ secrets.APP_STORE_PROFILE_NOTIFICATIONS }}
+          PROFILE_WIDGETS_B64: ${{ secrets.APP_STORE_PROFILE_WIDGETS }}
         run: |
           set -euo pipefail
           KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
@@ -116,6 +118,7 @@ jobs:
           }
           install_profile app "$PROFILE_B64" PROFILE_NAME
           install_profile ext "$PROFILE_EXT_B64" PROFILE_EXT_NAME
+          install_profile widgets "$PROFILE_WIDGETS_B64" PROFILE_WIDGETS_NAME
 
       - name: Archive (manual signing)
         if: steps.gate.outputs.ready == 'true'
@@ -199,6 +202,7 @@ jobs:
             <dict>
               <key>dev.winktech.moodring</key><string>${PROFILE_NAME}</string>
               <key>dev.winktech.moodring.notifications</key><string>${PROFILE_EXT_NAME}</string>
+              <key>dev.winktech.moodring.widgets</key><string>${PROFILE_WIDGETS_NAME}</string>
             </dict>
           </dict>
           </plist>

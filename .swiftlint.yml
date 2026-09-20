@@ -5,6 +5,7 @@ included:
   - App/Sources
   - Shared
   - Notifications
+  - Widgets
   - Tests
 
 line_length:

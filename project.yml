@@ -29,6 +29,7 @@ targets:
       - package: Sentry
         product: Sentry
       - target: HowdayNotifications
+      - target: HowdayWidgets
     settings:
       base:
         # Keeps the old product's name on purpose: an App ID can't be
@@ -136,6 +137,57 @@ targets:
           NSExtensionPointIdentifier: com.apple.usernotifications.service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
 
+  # WidgetKit extension: the friends' moods afloat on the home screen. Reads
+  # the board with the app's session (its keychain group is listed first in
+  # the entitlements, so a token refresh made here lands where the app
+  # looks) and names friends from the App Group name map. Display only —
+  # nothing is written from the widget.
+  HowdayWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared
+      - App/Sources/Core/AppConfig.swift
+      - App/Sources/Core/Supa.swift
+      - App/Sources/Core/MoodTheme.swift
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.winktech.moodring.widgets
+        DEVELOPMENT_TEAM: LNHGT6463S
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 2
+        TARGETED_DEVICE_FAMILY: 1
+        SKIP_INSTALL: YES
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Howday Widgets App Store
+    entitlements:
+      path: Widgets/HowdayWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.winktech.moodring
+        # The app's own keychain group, listed first: reads find the
+        # session the app stored, and writes (a token refresh) go there.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.winktech.moodring
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Howday Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SUPABASE_URL: $(SUPABASE_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
   # Unit tests for the pure pieces — phone parsing, contact candidates, the
   # wildcard, the local day, the reminder planner, the check-in queue —
   # which is where every client-side regression so far has been.
@@ -144,6 +196,11 @@ targets:
     platform: iOS
     sources:
       - Tests
+      # The widget's pure layout, compiled into the tests directly: the
+      # widget module itself can't be @testable-imported from an app-hosted
+      # test bundle.
+      - Widgets/SkyFriend.swift
+      - Widgets/SkyLayout.swift
     dependencies:
       - target: Howday
     settings:

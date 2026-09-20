@@ -1,5 +1,6 @@
 import Supabase
 import SwiftUI
+import WidgetKit
 
 /// The app's single screen. Until you've checked in, the mood picker fills
 /// it; picking an emoji IS the check-in, and the friends board takes over
@@ -254,6 +255,7 @@ struct HomeView: View {
                 confirmed = entry.emoji
                 notice = nil
                 ReminderScheduler.cancelToday()
+                WidgetCenter.shared.reloadAllTimelines()
                 // Same events as a direct save: the funnel counts the
                 // check-in once, when it actually reaches the server.
                 Analytics.track(entry.isEdit ? "checkin_edited" : "checkin_saved")
@@ -304,6 +306,8 @@ struct HomeView: View {
                 notice = nil
                 // The day's done; a reminder landing later would be noise.
                 ReminderScheduler.cancelToday()
+                // The widget's gate opens (or its emoji changes) with this.
+                WidgetCenter.shared.reloadAllTimelines()
                 // The emoji stays out of it — the mood is the private part.
                 Analytics.track(isFirstToday ? "checkin_saved" : "checkin_edited")
             } catch where error.isTransientNetwork {
