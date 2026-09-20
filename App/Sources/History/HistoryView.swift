@@ -1,7 +1,13 @@
 import SwiftUI
 
 struct HistoryView: View {
-    @State private var monthAnchor: Date = .now
+    /// Every month the sheet can reach: five years back through the current
+    /// one, which is the last page because there is nothing ahead of today.
+    /// The stack is lazy, so only the months on screen are ever built.
+    @State private var months: [Date] = HistoryView.monthWindow()
+    /// Which month the scroll view has settled on. Written by the scroll
+    /// view itself, which is what makes the header follow a swipe.
+    @State private var visibleMonth: Date?
     /// Every month loaded this visit, by month key. Swiping back and forth
     /// over the same months was re-fetching each time and showing an empty
     /// grid until the rows landed — which is what read as flicker.
@@ -9,37 +15,19 @@ struct HistoryView: View {
     @State private var selected: Checkin?
     @State private var errorMessage: String?
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
-    /// The width of one month, measured from the layout. `step` needs the
-    /// real number to slide a whole page.
-    @State private var pageWidth: CGFloat = 0
-    /// How far the finger has moved. `@GestureState` so a drag that never
-    /// ends — cancelled by the system, interrupted by a call — puts the
-    /// sheet back on its own. Left to `@State` it stuck part-way and the
-    /// neighbouring month sat visible at the edge for good.
-    @GestureState private var dragX: CGFloat = 0
-    /// Where the sheet rests between gestures: picked up from the drag the
-    /// moment the finger lifts, so the hand-over is invisible, then
-    /// animated home. This is what lets the release keep moving instead of
-    /// snapping to centre first.
-    @State private var settleX: CGFloat = 0
-
-    /// What the sheet is actually offset by.
-    private var sheetX: CGFloat { dragX + settleX }
-
-    /// A month's width plus the gap to the next one.
-    private var pageAdvance: CGFloat { pageWidth + pageGutter }
-
-    /// Space between months. Without it they touch, and the one arriving
-    /// reads as more rows of the one leaving.
-    private let pageGutter: CGFloat = 28
 
     /// The screen's margin, which each month carries itself rather than
-    /// inheriting from the column. That is what lets the sheet run the
-    /// full width and fade out over the margin instead of over the grid.
+    /// inheriting from the column. That is what lets the sheet run the full
+    /// width and fade out over the margin instead of over the grid; it also
+    /// puts two margins — a visible gap — between neighbouring months.
     private let pageMargin: CGFloat = 16
 
     private var calendar: Calendar { .current }
     private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
+
+    /// The month on screen. Nil until the scroll view reports one, which is
+    /// the moment before it has settled anywhere — the last page.
+    private var monthAnchor: Date { visibleMonth ?? months.last ?? .now }
 
     // Pushed from HomeView's toolbar, so it rides the home NavigationStack
     // rather than owning one.
@@ -72,32 +60,9 @@ struct HistoryView: View {
             MoodBackground(theme: .neutral)
         }
         // Nothing to scroll when the month fits, which is the usual case —
-        // without this the view still rubber-bands vertically under a
-        // horizontal swipe, and the two gestures read as fighting.
+        // without this the page rubber-bands vertically under a horizontal
+        // swipe, and the two directions read as fighting each other.
         .scrollBounceBehavior(.basedOnSize)
-        // Swipe to flip through months, the way a calendar does. Simultaneous
-        // rather than exclusive so the scroll view keeps vertical drags at
-        // accessibility text sizes, where the grid really is taller than the
-        // screen; the dominance test below is what keeps a diagonal drag
-        // from doing both at once. The chevrons stay — a gesture is not
-        // discoverable, and VoiceOver has no way to perform this one.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 16)
-                .updating($dragX) { drag, live, _ in
-                    guard isHorizontal(drag.translation) else { return }
-                    live = resisted(drag.translation.width)
-                }
-                .onEnded { drag in
-                    // Take the offset over from the gesture in the same
-                    // moment it lets go, so nothing moves on hand-over.
-                    settleX = isHorizontal(drag.translation) ? resisted(drag.translation.width) : 0
-                    guard isHorizontal(drag.translation), abs(drag.translation.width) > 60 else {
-                        withAnimation(.spring(duration: 0.3)) { settleX = 0 }
-                        return
-                    }
-                    step(months: drag.translation.width < 0 ? 1 : -1)
-                }
-        )
         .sensoryFeedback(.selection, trigger: monthKey)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("History")
@@ -110,6 +75,15 @@ struct HistoryView: View {
     }
 
     // MARK: month math
+
+    /// The months the sheet spans, oldest first so the current one is last
+    /// and the view opens on it.
+    private static func monthWindow(back: Int = 60) -> [Date] {
+        let calendar = Calendar.current
+        return (0...back).reversed().compactMap {
+            calendar.date(byAdding: .month, value: -$0, to: .now)
+        }
+    }
 
     private var monthStart: Date { monthStart(of: monthAnchor) }
     private var monthKey: String { monthKey(of: monthAnchor) }
@@ -162,51 +136,19 @@ struct HistoryView: View {
 
     // MARK: subviews
 
-    /// A pull toward the future drags heavily and springs back: there is
-    /// nothing ahead of today to show, and resistance says so better than
-    /// simply refusing to move.
-    private func resisted(_ travel: CGFloat) -> CGFloat {
-        travel < 0 && isCurrentMonth ? travel / 4 : travel
-    }
-
-    /// Whether a drag is for the months rather than for the scroll view.
-    /// Clearly horizontal, not merely more horizontal: a lazy diagonal
-    /// scroll should move the page and leave the month alone.
-    private func isHorizontal(_ translation: CGSize) -> Bool {
-        abs(translation.width) > abs(translation.height) * 1.5
-    }
-
-    /// Moves by whole months, and is the only way the month changes — the
-    /// chevrons and the swipe share it so both animate the same way and
-    /// both stop at the current month. There is nothing to show ahead of
-    /// today, and a forward swipe into an empty grid reads as a bug.
-    private func step(months: Int) {
-        guard months < 0 || !isCurrentMonth,
-              pageWidth > 0,
-              let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else {
-            withAnimation(.spring(duration: 0.3)) { settleX = 0 }
-            return
-        }
-        // Slide the sheet a whole page, so the month already half on screen
-        // simply finishes arriving. Only once it has landed does the anchor
-        // move and the offset reset — both without animation, which puts the
-        // new month exactly where the old one was standing.
-        withAnimation(.easeInOut(duration: 0.28)) {
-            settleX = CGFloat(-months) * pageAdvance
-        } completion: {
-            var landing = Transaction()
-            landing.disablesAnimations = true
-            withTransaction(landing) {
-                monthAnchor = moved
-                settleX = 0
-            }
-        }
+    /// Moves a month at a time for the chevrons. Swiping doesn't come
+    /// through here — the scroll view does that itself.
+    private func move(_ delta: Int) {
+        guard let index = months.firstIndex(where: { monthKey(of: $0) == monthKey }) else { return }
+        let target = index + delta
+        guard months.indices.contains(target) else { return }
+        withAnimation { visibleMonth = months[target] }
     }
 
     private var monthHeader: some View {
         HStack {
             Button {
-                step(months: -1)
+                move(-1)
             } label: {
                 Image(systemName: "chevron.left")
             }
@@ -217,7 +159,7 @@ struct HistoryView: View {
                 .contentTransition(.numericText())
             Spacer()
             Button {
-                step(months: 1)
+                move(1)
             } label: {
                 Image(systemName: "chevron.right")
             }
@@ -240,34 +182,31 @@ struct HistoryView: View {
         }
     }
 
-    /// Three months side by side — last, this, next — in a window one month
-    /// wide. Dragging moves the whole sheet, so the month you are pulling
-    /// toward is already on screen and already filled in, rather than
-    /// appearing once the swipe is over.
+    /// The months as one long sheet, paged by the scroll view itself rather
+    /// than by a drag gesture of ours. That is what buys the native feel: a
+    /// flick carries its velocity into the next month, a slow drag tracks
+    /// the finger exactly, the ends rubber-band, and a swipe can interrupt
+    /// the one still settling. Hand-rolling those is how it ends up stiff.
     private var monthPager: some View {
-        GeometryReader { proxy in
-            let page = proxy.size.width
-            HStack(spacing: pageGutter) {
-                dayGrid(of: shifted(-1)).frame(width: page)
-                dayGrid(of: monthAnchor).frame(width: page)
-                // Nothing to show ahead of today: the page stays blank so
-                // the resisted pull reveals an edge, not an empty calendar.
-                Group {
-                    if isCurrentMonth {
-                        Color.clear
-                    } else {
-                        dayGrid(of: shifted(1))
-                    }
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(months, id: \.self) { anchor in
+                    dayGrid(of: anchor)
+                        .frame(height: pagerHeight)
+                        .containerRelativeFrame(.horizontal)
                 }
-                .frame(width: page)
             }
-            .offset(x: -(page + pageGutter) + sheetX)
-            .onChange(of: page, initial: true) { _, width in pageWidth = width }
+            .scrollTargetLayout()
         }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $visibleMonth)
+        .scrollIndicators(.hidden)
+        // The current month is the last page, and the sheet opens on it.
+        .defaultScrollAnchor(.trailing)
         .frame(height: pagerHeight)
         // A month leaves by thinning out rather than being sliced off at
-        // the edge; it is also what hides the neighbours at rest. The fade
-        // spans the margin exactly, so it never touches a day cell.
+        // the edge. The fade spans the margin exactly, so it never falls
+        // across a day cell.
         .mask(edgeFade)
     }
 
@@ -311,10 +250,10 @@ struct HistoryView: View {
     private func load() async {
         errorMessage = nil
         do {
-            // All three visible months in one query: a neighbour has to be
-            // filled in before the drag starts, or the month sliding in is
-            // an empty grid. Re-run even when cached — the current month
-            // changes under you when you check in.
+            // All three months around this one in a single query: a
+            // neighbour has to be filled in before the swipe starts, or the
+            // month arriving is an empty grid. Re-run even when cached — the
+            // current month changes under you when you check in.
             let ahead = shifted(1)
             let first = LocalDay.string(for: monthStart(of: shifted(-1)))
             let last = LocalDay.string(for: date(day: daysInMonth(of: ahead), of: ahead))

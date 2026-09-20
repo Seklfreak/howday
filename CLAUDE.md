@@ -366,6 +366,26 @@ and window-geometry guessing; AXe needs neither.
   the contacts prompt on first board load; that stays the way back in for
   someone who skipped.
 
+## History
+
+- The months page with the **system's own** paged scrolling: a horizontal
+  `ScrollView` over a `LazyHStack` of month anchors (five years back, the
+  current month last), `.scrollTargetBehavior(.paging)`,
+  `.scrollPosition(id:)` for the header, `.defaultScrollAnchor(.trailing)`
+  to open on today. **Do not hand-roll this with a `DragGesture`** — it was,
+  and it felt stiff: a gesture commit on distance alone ignores velocity so
+  a flick springs back, a fixed-duration animation ignores how fast the
+  finger moved, `minimumDistance` swallows the first points, and none of it
+  can be interrupted mid-animation. Velocity, deceleration, rubber-banding
+  at the ends and interruption are exactly what the scroll view gives free.
+- One query covers the month either side as well as the one on screen, and
+  `monthCache` keeps every month seen this visit — a page arriving empty
+  and filling in a moment later is what reads as flicker.
+- The page is fixed at six rows so a five-row month cannot change the
+  height mid-swipe, and each month carries the screen margin itself so the
+  pager can span the full width; the `edgeFade` mask then fades over that
+  margin rather than across a day cell.
+
 ## Daily reminder
 
 - The reminder fires at a **random minute inside a window** (default 8:00–22:00),
