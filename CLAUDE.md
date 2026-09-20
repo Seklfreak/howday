@@ -409,6 +409,11 @@ and window-geometry guessing; AXe needs neither.
   PKCS#12 encryption. `security import` exits 0 but yields "0 valid
   identities" for key-only or PBES2/AES p12s — always verify with
   `security find-identity` after changing the secret.
+- `release.yaml` only triggers a TestFlight build when the release touched
+  the shipped code — the path filter names `App/`, `Widgets/`,
+  `Notifications/`, `Shared/`, `Config/` and `project.yml`. A new source
+  directory must be added there, or its releases get a tag and no build
+  (v1.23.1 and v1.23.2 were widget-only and shipped nothing).
 - Build number = CI run number; marketing version = the tag's major.minor
   (patch releases reuse the approved TestFlight version, so only minor/major
   bumps trigger a real Beta App Review). TestFlight requires strictly

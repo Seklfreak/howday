@@ -61,14 +61,16 @@ jobs:
           # testflight-refresh.yaml still rebuilds monthly, so the
           # TestFlight build cannot expire during a run of them.
           build-workflow: |
-            testflight.yaml:^(App|Config)/|^project\.yml
+            testflight.yaml:^(App|Widgets|Notifications|Shared|Config)/|^project\.yml
           project-description: >-
             Howday is an iOS app (SwiftUI, whole repo) shipped to TestFlight
             on every version tag: a daily mood check-in shared with friends.
-            Changes under App/ and supabase/ reach users — supabase/ holds the
-            backend schema and Edge Functions the shipped app talks to. Only
-            scripts/, README and CI workflows live outside the released
-            artifact.
+            Changes under App/, Widgets/, Notifications/, Shared/ and
+            supabase/ reach users — Widgets/ and Notifications/ are app
+            extensions shipped inside the app, Shared/ is code compiled into
+            all of them, and supabase/ holds the backend schema and Edge
+            Functions the shipped app talks to. Only scripts/, Tests/, README
+            and CI workflows live outside the released artifact.
 
             Bump policy: the app's TestFlight marketing version is the tag's
             major.minor, so a minor bump starts a NEW marketing version, and the first
