@@ -2,7 +2,10 @@ import SwiftUI
 
 struct HistoryView: View {
     @State private var monthAnchor: Date = .now
-    @State private var checkinsByDay: [String: Checkin] = [:]
+    /// Every month loaded this visit, by month key. Swiping back and forth
+    /// over the same months was re-fetching each time and showing an empty
+    /// grid until the rows landed — which is what read as flicker.
+    @State private var monthCache: [String: [String: Checkin]] = [:]
     @State private var selected: Checkin?
     @State private var errorMessage: String?
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
@@ -10,10 +13,12 @@ struct HistoryView: View {
     /// transition matches the direction of travel rather than always
     /// arriving from the same side.
     @State private var slideForward = true
-    /// How far the month has been dragged, live. `@GestureState` so it
-    /// falls back to zero on its own the moment the finger lifts — the
-    /// month either commits or springs back, never sticks half-way.
-    @GestureState private var dragX: CGFloat = 0
+    /// How far the month has been dragged, live. Deliberately not
+    /// `@GestureState`, which snaps back to zero the instant the finger
+    /// lifts: the grid would jump to centre and only then slide away. This
+    /// animates to zero as part of the same change that moves the month,
+    /// so the drag and the slide are one movement.
+    @State private var dragX: CGFloat = 0
 
     private var calendar: Calendar { .current }
     private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
@@ -31,12 +36,15 @@ struct HistoryView: View {
                 Group {
                     weekdayHeader
                     dayGrid
-                        .offset(x: dragX)
                         .id(monthKey)
                         .transition(.asymmetric(
                             insertion: .move(edge: slideForward ? .trailing : .leading),
                             removal: .move(edge: slideForward ? .leading : .trailing)
                         ))
+                        // Outside the transition, so the months being
+                        // swapped move together as one thing under the
+                        // thumb rather than each chasing its own offset.
+                        .offset(x: dragX)
                         // The outgoing and incoming months overlap mid-slide;
                         // without this they paint over the header and the
                         // screen's edges.
@@ -66,16 +74,19 @@ struct HistoryView: View {
         // discoverable, and VoiceOver has no way to perform this one.
         .simultaneousGesture(
             DragGesture(minimumDistance: 16)
-                .updating($dragX) { drag, offset, _ in
+                .onChanged { drag in
                     guard isHorizontal(drag.translation) else { return }
                     // A pull toward the future drags heavily and springs
                     // back: there is nothing ahead of today to show, and
                     // resistance says so better than simply not moving.
                     let travel = drag.translation.width
-                    offset = travel < 0 && isCurrentMonth ? travel / 4 : travel
+                    dragX = travel < 0 && isCurrentMonth ? travel / 4 : travel
                 }
                 .onEnded { drag in
-                    guard isHorizontal(drag.translation), abs(drag.translation.width) > 60 else { return }
+                    guard isHorizontal(drag.translation), abs(drag.translation.width) > 60 else {
+                        withAnimation(.spring(duration: 0.3)) { dragX = 0 }
+                        return
+                    }
                     step(months: drag.translation.width < 0 ? 1 : -1)
                 }
         )
@@ -97,6 +108,10 @@ struct HistoryView: View {
     }
 
     private var monthKey: String { LocalDay.string(for: monthStart) }
+
+    /// This month's check-ins, or nothing while a month never seen this
+    /// visit is still loading.
+    private var checkins: [String: Checkin] { monthCache[monthKey] ?? [:] }
 
     private var daysInMonth: Int {
         calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30
@@ -133,7 +148,12 @@ struct HistoryView: View {
         guard months < 0 || !isCurrentMonth,
               let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else { return }
         slideForward = months > 0
-        withAnimation(.easeInOut(duration: 0.25)) { monthAnchor = moved }
+        // One animation for both: the month slides in as the drag unwinds, so
+        // there is no frame where the grid has jumped back to centre.
+        withAnimation(.easeInOut(duration: 0.25)) {
+            monthAnchor = moved
+            dragX = 0
+        }
     }
 
     private var monthHeader: some View {
@@ -182,7 +202,7 @@ struct HistoryView: View {
                 Color.clear.frame(height: cellHeight)
             }
             ForEach(1...daysInMonth, id: \.self) { day in
-                let checkin = checkinsByDay[LocalDay.string(for: date(day: day))]
+                let checkin = checkins[LocalDay.string(for: date(day: day))]
                 DayCell(day: day, checkin: checkin, isToday: calendar.isDateInToday(date(day: day)))
                     .onTapGesture {
                         if let checkin { selected = checkin }
@@ -197,7 +217,9 @@ struct HistoryView: View {
             let first = LocalDay.string(for: monthStart)
             let last = LocalDay.string(for: date(day: daysInMonth))
             let rows = try await withSkewRetry { try await CheckinRepository().mine(from: first, to: last) }
-            checkinsByDay = Dictionary(uniqueKeysWithValues: rows.map { ($0.day, $0) })
+            // Keyed by month, and refreshed even when already cached: the
+            // current month changes under you when you check in.
+            monthCache[monthKey] = Dictionary(uniqueKeysWithValues: rows.map { ($0.day, $0) })
         } catch {
             // Leaving the tab cancels the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
