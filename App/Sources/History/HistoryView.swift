@@ -12,12 +12,31 @@ struct HistoryView: View {
     /// The width of one month, measured from the layout. `step` needs the
     /// real number to slide a whole page.
     @State private var pageWidth: CGFloat = 0
-    /// How far the month has been dragged, live. Deliberately not
-    /// `@GestureState`, which snaps back to zero the instant the finger
-    /// lifts: the grid would jump to centre and only then slide away. This
-    /// animates to zero as part of the same change that moves the month,
-    /// so the drag and the slide are one movement.
-    @State private var dragX: CGFloat = 0
+    /// How far the finger has moved. `@GestureState` so a drag that never
+    /// ends — cancelled by the system, interrupted by a call — puts the
+    /// sheet back on its own. Left to `@State` it stuck part-way and the
+    /// neighbouring month sat visible at the edge for good.
+    @GestureState private var dragX: CGFloat = 0
+    /// Where the sheet rests between gestures: picked up from the drag the
+    /// moment the finger lifts, so the hand-over is invisible, then
+    /// animated home. This is what lets the release keep moving instead of
+    /// snapping to centre first.
+    @State private var settleX: CGFloat = 0
+
+    /// What the sheet is actually offset by.
+    private var sheetX: CGFloat { dragX + settleX }
+
+    /// A month's width plus the gap to the next one.
+    private var pageAdvance: CGFloat { pageWidth + pageGutter }
+
+    /// Space between months. Without it they touch, and the one arriving
+    /// reads as more rows of the one leaving.
+    private let pageGutter: CGFloat = 28
+
+    /// The screen's margin, which each month carries itself rather than
+    /// inheriting from the column. That is what lets the sheet run the
+    /// full width and fade out over the margin instead of over the grid.
+    private let pageMargin: CGFloat = 16
 
     private var calendar: Calendar { .current }
     private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
@@ -27,21 +46,25 @@ struct HistoryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                monthHeader
+                monthHeader.padding(.horizontal, pageMargin)
                 // Seven columns cannot hold accessibility-size digits: at
                 // the largest setting every two-digit day became "…". The
                 // grid follows the text size up to the last regular step
                 // and stops there; the cells still grow (TypeScale).
                 Group {
-                    weekdayHeader
+                    weekdayHeader.padding(.horizontal, pageMargin)
+                    // No margin here: the sheet spans the screen so a month
+                    // can fade out over the margin rather than at the grid.
                     monthPager
                 }
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).font(.footnote)
+                    Text(errorMessage)
+                        .foregroundStyle(.red).font(.footnote)
+                        .padding(.horizontal, pageMargin)
                 }
             }
-            .padding()
+            .padding(.vertical)
         }
         .background {
             // Neutral by design: a month holds many moods — the cells carry
@@ -60,17 +83,16 @@ struct HistoryView: View {
         // discoverable, and VoiceOver has no way to perform this one.
         .simultaneousGesture(
             DragGesture(minimumDistance: 16)
-                .onChanged { drag in
+                .updating($dragX) { drag, live, _ in
                     guard isHorizontal(drag.translation) else { return }
-                    // A pull toward the future drags heavily and springs
-                    // back: there is nothing ahead of today to show, and
-                    // resistance says so better than simply not moving.
-                    let travel = drag.translation.width
-                    dragX = travel < 0 && isCurrentMonth ? travel / 4 : travel
+                    live = resisted(drag.translation.width)
                 }
                 .onEnded { drag in
+                    // Take the offset over from the gesture in the same
+                    // moment it lets go, so nothing moves on hand-over.
+                    settleX = isHorizontal(drag.translation) ? resisted(drag.translation.width) : 0
                     guard isHorizontal(drag.translation), abs(drag.translation.width) > 60 else {
-                        withAnimation(.spring(duration: 0.3)) { dragX = 0 }
+                        withAnimation(.spring(duration: 0.3)) { settleX = 0 }
                         return
                     }
                     step(months: drag.translation.width < 0 ? 1 : -1)
@@ -140,6 +162,13 @@ struct HistoryView: View {
 
     // MARK: subviews
 
+    /// A pull toward the future drags heavily and springs back: there is
+    /// nothing ahead of today to show, and resistance says so better than
+    /// simply refusing to move.
+    private func resisted(_ travel: CGFloat) -> CGFloat {
+        travel < 0 && isCurrentMonth ? travel / 4 : travel
+    }
+
     /// Whether a drag is for the months rather than for the scroll view.
     /// Clearly horizontal, not merely more horizontal: a lazy diagonal
     /// scroll should move the page and leave the month alone.
@@ -155,7 +184,7 @@ struct HistoryView: View {
         guard months < 0 || !isCurrentMonth,
               pageWidth > 0,
               let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else {
-            withAnimation(.spring(duration: 0.3)) { dragX = 0 }
+            withAnimation(.spring(duration: 0.3)) { settleX = 0 }
             return
         }
         // Slide the sheet a whole page, so the month already half on screen
@@ -163,13 +192,13 @@ struct HistoryView: View {
         // move and the offset reset — both without animation, which puts the
         // new month exactly where the old one was standing.
         withAnimation(.easeInOut(duration: 0.28)) {
-            dragX = CGFloat(-months) * pageWidth
+            settleX = CGFloat(-months) * pageAdvance
         } completion: {
-            var settle = Transaction()
-            settle.disablesAnimations = true
-            withTransaction(settle) {
+            var landing = Transaction()
+            landing.disablesAnimations = true
+            withTransaction(landing) {
                 monthAnchor = moved
-                dragX = 0
+                settleX = 0
             }
         }
     }
@@ -218,7 +247,7 @@ struct HistoryView: View {
     private var monthPager: some View {
         GeometryReader { proxy in
             let page = proxy.size.width
-            HStack(spacing: 0) {
+            HStack(spacing: pageGutter) {
                 dayGrid(of: shifted(-1)).frame(width: page)
                 dayGrid(of: monthAnchor).frame(width: page)
                 // Nothing to show ahead of today: the page stays blank so
@@ -232,13 +261,24 @@ struct HistoryView: View {
                 }
                 .frame(width: page)
             }
-            .offset(x: -page + dragX)
+            .offset(x: -(page + pageGutter) + sheetX)
             .onChange(of: page, initial: true) { _, width in pageWidth = width }
         }
         .frame(height: pagerHeight)
-        // The neighbours are always beside the window; this is what keeps
-        // them out of sight until they are dragged in.
-        .clipped()
+        // A month leaves by thinning out rather than being sliced off at
+        // the edge; it is also what hides the neighbours at rest. The fade
+        // spans the margin exactly, so it never touches a day cell.
+        .mask(edgeFade)
+    }
+
+    private var edgeFade: some View {
+        HStack(spacing: 0) {
+            LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                .frame(width: pageMargin)
+            Color.black
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: pageMargin)
+        }
     }
 
     private func dayGrid(of anchor: Date) -> some View {
@@ -264,6 +304,7 @@ struct HistoryView: View {
                     }
             }
         }
+        .padding(.horizontal, pageMargin)
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
@@ -289,89 +330,5 @@ struct HistoryView: View {
             guard !error.isCancellation else { return }
             errorMessage = error.report("history.load")
         }
-    }
-}
-
-private struct DayCell: View {
-    /// Cell height at the default text size.
-    static let baseHeight: CGFloat = 40
-
-    let day: Int
-    let checkin: Checkin?
-    let isToday: Bool
-
-    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
-
-    /// The day's mood colors — nil for days without a check-in, which stay
-    /// a faint neutral so the month reads as a color story at arm's length.
-    private var theme: MoodTheme? {
-        checkin.map { MoodTheme.forEmoji($0.emoji) }
-    }
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(theme?.accent.opacity(0.22) ?? .white.opacity(0.045))
-            .frame(height: 40)
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(theme?.accent.opacity(0.35) ?? .white.opacity(0.05), lineWidth: 1)
-            }
-            .overlay {
-                if let checkin {
-                    VStack(spacing: 0) {
-                        Text("\(day)")
-                            .font(.system(size: 9))
-                            .fontWeight(isToday ? .bold : .regular)
-                            .foregroundStyle(.secondary)
-                        Text(checkin.emoji)
-                            .font(.system(size: 17))
-                    }
-                } else {
-                    Text("\(day)")
-                        .font(.caption)
-                        .fontWeight(isToday ? .bold : .regular)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .overlay {
-                if isToday {
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(theme?.accent ?? .primary, lineWidth: 1.5)
-                }
-            }
-    }
-}
-
-private struct CheckinDetailSheet: View {
-    let checkin: Checkin
-
-    @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var theme: MoodTheme { MoodTheme.forEmoji(checkin.emoji) }
-
-    /// "Wednesday, August 19" instead of the stored "2026-08-19" — with the
-    /// month abbreviated at the accessibility sizes, where the sheet's
-    /// fixed height leaves the full form one truncated line.
-    private var dateText: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: checkin.day) else { return checkin.day }
-        let month: Date.FormatStyle.Symbol.Month = dynamicTypeSize.isAccessibilitySize ? .abbreviated : .wide
-        return date.formatted(.dateTime.weekday(.wide).month(month).day())
-    }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Text(checkin.emoji)
-                .font(.system(size: 44 * TypeScale.clamp(scale)))
-                .frame(width: 84 * TypeScale.clamp(scale), height: 84 * TypeScale.clamp(scale))
-                .background(Circle().fill(.white.opacity(0.07)))
-                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 3))
-                .shadow(color: theme.accent.opacity(0.55), radius: 12)
-            Text(dateText).font(.subheadline).foregroundStyle(.secondary)
-        }
-        .padding()
-        .presentationBackground(theme.deep)
     }
 }
