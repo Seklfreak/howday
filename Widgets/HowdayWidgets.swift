@@ -51,12 +51,15 @@ struct SkyProvider: TimelineProvider {
     }
 
     /// One board read, shown as an entry every five minutes for the next
-    /// half hour: the same snapshot, the emoji drifted a little further
+    /// two hours: the same snapshot, the emoji drifted a little further
     /// each step (WidgetKit animates the change between entries, which is
     /// as close to floating as a widget gets). The timeline then rebuilds
     /// with a fresh read — or at midnight, when the day and its sky
-    /// change. The app and the notification extension reload it on top of
-    /// that whenever something actually changes.
+    /// change. Two hours, not thirty minutes: every rebuild spends the
+    /// refresh budget iOS gives a widget for the day (a few dozen), and
+    /// past it iOS delays reloads until the widget sits on a stale entry
+    /// for hours. The app and the notification extension reload it
+    /// whenever something actually changes, which is what keeps it fresh.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SkyEntry>) -> Void) {
         Task {
             let now = Date.now
@@ -70,7 +73,7 @@ struct SkyProvider: TimelineProvider {
             let firstBoundary = (now.timeIntervalSince1970 / step).rounded(.up) * step
             var dates = [now]
             var next = Date(timeIntervalSince1970: firstBoundary)
-            while next < min(now.addingTimeInterval(30 * 60), midnight) {
+            while next < min(now.addingTimeInterval(2 * 60 * 60), midnight) {
                 dates.append(next)
                 next = next.addingTimeInterval(step)
             }

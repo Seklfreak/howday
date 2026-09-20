@@ -39,13 +39,6 @@ private struct CircularRing: View {
     let snapshot: SkySnapshot
     let at: Date
 
-    private var hoursLeft: Int {
-        let midnight = Calendar.current.nextDate(
-            after: at, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime
-        ) ?? at
-        return max(1, Int((midnight.timeIntervalSince(at) / 3600).rounded(.up)))
-    }
-
     /// How much of the day is still ahead, as the arc's share of the ring.
     private var dayRemaining: Double {
         let start = Calendar.current.startOfDay(for: at)
@@ -60,15 +53,11 @@ private struct CircularRing: View {
                     .trim(from: 0, to: dayRemaining)
                     .stroke(.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                VStack(spacing: 0) {
-                    Text(mine).font(.system(size: 24))
-                    Text("\(hoursLeft) H LEFT")
-                        .font(.system(size: 7, weight: .heavy, design: .rounded))
-                        .tracking(0.3)
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Your mood today: \(mine); \(hoursLeft) hours left to change it")
+                // The arc says how much of the day is left to change it;
+                // no countdown text — the emoji is the widget.
+                Text(mine)
+                    .font(.system(size: 30))
+                    .accessibilityLabel("Your mood today: \(mine)")
             } else {
                 Circle()
                     .stroke(.white.opacity(0.45), style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [3, 4.5]))
@@ -107,8 +96,10 @@ private struct RectangularStrip: View {
             HStack(spacing: 4) {
                 ForEach(snapshot.choices, id: \.self) { choice in
                     Button(intent: CheckInIntent(emoji: choice)) {
+                        // 14pt in a 24pt circle: a square emoji's diagonal
+                        // (about 1.4× its size) stays inside the ring.
                         Text(choice)
-                            .font(.system(size: 17))
+                            .font(.system(size: 14))
                             .frame(width: 24, height: 24)
                             .overlay {
                                 Circle().strokeBorder(
@@ -140,10 +131,11 @@ private struct RectangularStrip: View {
                     ForEach(snapshot.friends.prefix(5)) { friend in
                         VStack(spacing: 2) {
                             if let emoji = friend.emoji {
+                                // No ring: a square emoji in a tight circle
+                                // looked cropped, and the emoji is the point.
                                 Text(emoji)
-                                    .font(.system(size: 16))
+                                    .font(.system(size: 21))
                                     .frame(width: 24, height: 24)
-                                    .overlay { Circle().strokeBorder(.white.opacity(0.9), lineWidth: 1.5) }
                             } else {
                                 Circle()
                                     .strokeBorder(.white.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [2.5, 2.5]))

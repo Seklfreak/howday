@@ -5,9 +5,11 @@ import Testing
 /// The widget's emoji placement: deterministic per day and size, newest
 /// biggest, nothing overlapping, and the large widget's x is the time.
 struct SkyLayoutTests {
-    private func friend(_ name: String, emoji: String?, hour: Int?) -> SkyFriend {
+    /// Fixed ids: the drift is seeded by the friend's id, and a per-process
+    /// hash would make the sky differ from one test run to the next.
+    private func friend(_ index: Int, _ name: String, emoji: String?, hour: Int?) -> SkyFriend {
         SkyFriend(
-            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", abs(name.hashValue % 90) + 10))") ?? UUID(),
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", index))") ?? UUID(),
             name: name, emoji: emoji,
             checkedInAt: hour.map { Calendar.current.date(bySettingHour: $0, minute: 0, second: 0, of: .now)! }
         )
@@ -15,9 +17,9 @@ struct SkyLayoutTests {
 
     private var friends: [SkyFriend] {
         [
-            friend("Chloé", emoji: "😢", hour: 18), friend("Jonas", emoji: "😕", hour: 14),
-            friend("Ben", emoji: "😐", hour: 11), friend("Sam", emoji: "🙂", hour: 10),
-            friend("Anna", emoji: "😄", hour: 9), friend("Dev", emoji: nil, hour: nil),
+            friend(1, "Chloé", emoji: "😢", hour: 18), friend(2, "Jonas", emoji: "😕", hour: 14),
+            friend(3, "Ben", emoji: "😐", hour: 11), friend(4, "Sam", emoji: "🙂", hour: 10),
+            friend(5, "Anna", emoji: "😄", hour: 9), friend(6, "Dev", emoji: nil, hour: nil),
         ]
     }
 
@@ -55,14 +57,22 @@ struct SkyLayoutTests {
         }
     }
 
+    /// Across a run of drift steps, not just the dealt positions: the
+    /// placement has to leave room for two neighbours to drift toward
+    /// each other.
     @Test func emojiDoNotOverlapWhereThereIsRoom() {
-        let layout = SkyLayout.scattered(friends, in: large, day: "2026-09-19")
-        for (index, one) in layout.placements.enumerated() {
-            for other in layout.placements.dropFirst(index + 1) {
-                let dx = one.center.x - other.center.x
-                let dy = one.center.y - other.center.y
-                let distance = (dx * dx + dy * dy).squareRoot()
-                #expect(distance >= (one.diameter + other.diameter) / 2, "\(one.friend.name) vs \(other.friend.name)")
+        for phase in stride(from: 0, to: 60, by: 7) {
+            let layout = SkyLayout.scattered(friends, in: large, day: "2026-09-19", phase: phase)
+            for (index, one) in layout.placements.enumerated() {
+                for other in layout.placements.dropFirst(index + 1) {
+                    let dx = one.center.x - other.center.x
+                    let dy = one.center.y - other.center.y
+                    let distance = (dx * dx + dy * dy).squareRoot()
+                    #expect(
+                        distance >= (one.diameter + other.diameter) / 2,
+                        "\(one.friend.name) vs \(other.friend.name) at phase \(phase)"
+                    )
+                }
             }
         }
     }

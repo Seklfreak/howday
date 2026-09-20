@@ -35,9 +35,12 @@ struct SkyLayout {
     /// Scattered, non-overlapping, newest biggest — the small and medium
     /// widgets. `inset` keeps the glow off the widget's edge; `topInset`
     /// and `bottomInset` leave room for a header or a caption.
-    /// How far a step of drift moves an emoji, in points. Small enough that
-    /// the clearance the placement left keeps neighbours apart.
+    /// How far a step of drift moves an emoji, in points.
     static let driftAmplitude: CGFloat = 6
+
+    /// The gap the placement tries to leave between two emoji: room for
+    /// both to drift toward each other and still not touch.
+    static let minimumClearance: CGFloat = 2 * driftAmplitude + 2
 
     /// Which five-minute step of the day a date falls in. The drift is a
     /// function of this, so a timeline rebuilt at any moment shows the sky
@@ -75,7 +78,7 @@ struct SkyLayout {
                     bestClearance = clearance
                     best = candidate
                 }
-                if clearance >= 6 { break }
+                if clearance >= minimumClearance { break }
             }
             placed.append(Placement(friend: friend, center: best, diameter: diameter))
         }
@@ -119,7 +122,7 @@ struct SkyLayout {
                     bestClearance = clearance
                     best = candidate
                 }
-                if clearance >= 6 { break }
+                if clearance >= minimumClearance { break }
             }
             placed.append(Placement(friend: friend, center: best, diameter: diameter))
         }

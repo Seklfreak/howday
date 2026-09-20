@@ -241,7 +241,7 @@ private struct BoardCard: View {
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     private var avatarSize: CGFloat { 56 * TypeScale.clamp(scale) }
-    private var badgeSize: CGFloat { 26 * TypeScale.clamp(scale) }
+    private var badgeSize: CGFloat { 28 * TypeScale.clamp(scale) }
 
     /// Tapping a friend starts a chat with them. sms: goes to the system's
     /// default messaging app (user-selectable since iOS 18.2), so this lands
@@ -284,8 +284,10 @@ private struct BoardCard: View {
                     }
                     .shadow(color: ringTheme?.accent.opacity(0.5) ?? .clear, radius: 8)
                 if let emoji = entry.checkin?.emoji {
+                    // 16 in 28: a square emoji's diagonal stays inside the
+                    // round badge instead of touching its edge.
                     Text(emoji)
-                        .font(.system(size: 18 * TypeScale.clamp(scale)))
+                        .font(.system(size: 16 * TypeScale.clamp(scale)))
                         .frame(width: badgeSize, height: badgeSize)
                         .background(Circle().fill(Color(red: 0.13, green: 0.12, blue: 0.17)))
                         .offset(x: 5, y: 5)
