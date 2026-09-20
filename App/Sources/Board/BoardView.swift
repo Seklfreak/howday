@@ -284,17 +284,15 @@ private struct BoardCard: View {
                     }
                     .shadow(color: ringTheme?.accent.opacity(0.5) ?? .clear, radius: 8)
                 if let emoji = entry.checkin?.emoji {
-                    // A rounded square, not a circle: the wildcard can be a
-                    // square emoji (🎑, 🖼), and a circle either crops it
-                    // or shrinks it to nothing. This shape fits both.
+                    // No plate behind it: a circle cropped square wildcards
+                    // and a square looked like a sticker. The emoji itself
+                    // is the badge, with a soft shadow where it crosses the
+                    // ring.
                     Text(emoji)
-                        .font(.system(size: 24 * TypeScale.clamp(scale)))
+                        .font(.system(size: 30 * TypeScale.clamp(scale)))
                         .frame(width: badgeSize, height: badgeSize)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10 * TypeScale.clamp(scale), style: .continuous)
-                                .fill(Color(red: 0.13, green: 0.12, blue: 0.17))
-                        )
-                        .offset(x: 7, y: 7)
+                        .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+                        .offset(x: 8, y: 8)
                 }
             }
             Text(entry.identity.name)
