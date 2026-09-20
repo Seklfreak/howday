@@ -6,6 +6,9 @@ struct HowdayWidgetBundle: WidgetBundle {
     var body: some Widget {
         FriendsSkyWidget()
         CheckInWidget()
+        if #available(iOS 18.0, *) {
+            CheckInControl()
+        }
     }
 }
 
