@@ -9,10 +9,9 @@ struct HistoryView: View {
     @State private var selected: Checkin?
     @State private var errorMessage: String?
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
-    /// Which way the grid should slide. Set before the month changes so the
-    /// transition matches the direction of travel rather than always
-    /// arriving from the same side.
-    @State private var slideForward = true
+    /// The width of one month, measured from the layout. `step` needs the
+    /// real number to slide a whole page.
+    @State private var pageWidth: CGFloat = 0
     /// How far the month has been dragged, live. Deliberately not
     /// `@GestureState`, which snaps back to zero the instant the finger
     /// lifts: the grid would jump to centre and only then slide away. This
@@ -35,20 +34,7 @@ struct HistoryView: View {
                 // and stops there; the cells still grow (TypeScale).
                 Group {
                     weekdayHeader
-                    dayGrid
-                        .id(monthKey)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: slideForward ? .trailing : .leading),
-                            removal: .move(edge: slideForward ? .leading : .trailing)
-                        ))
-                        // Outside the transition, so the months being
-                        // swapped move together as one thing under the
-                        // thumb rather than each chasing its own offset.
-                        .offset(x: dragX)
-                        // The outgoing and incoming months overlap mid-slide;
-                        // without this they paint over the header and the
-                        // screen's edges.
-                        .clipped()
+                    monthPager
                 }
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 if let errorMessage {
@@ -103,23 +89,37 @@ struct HistoryView: View {
 
     // MARK: month math
 
-    private var monthStart: Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: monthAnchor)) ?? monthAnchor
+    private var monthStart: Date { monthStart(of: monthAnchor) }
+    private var monthKey: String { monthKey(of: monthAnchor) }
+
+    private func monthStart(of anchor: Date) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: anchor)) ?? anchor
     }
 
-    private var monthKey: String { LocalDay.string(for: monthStart) }
+    /// `yyyy-MM`, which is also the prefix of every `checkins.day` in that
+    /// month — how one query's rows get sorted into three months.
+    private func monthKey(of anchor: Date) -> String {
+        String(LocalDay.string(for: monthStart(of: anchor)).prefix(7))
+    }
 
-    /// This month's check-ins, or nothing while a month never seen this
-    /// visit is still loading.
-    private var checkins: [String: Checkin] { monthCache[monthKey] ?? [:] }
+    /// The month `months` away from the one on screen.
+    private func shifted(_ months: Int) -> Date {
+        calendar.date(byAdding: .month, value: months, to: monthAnchor) ?? monthAnchor
+    }
 
-    private var daysInMonth: Int {
-        calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30
+    /// A month's check-ins, or nothing while a month never seen this visit
+    /// is still loading.
+    private func checkins(of anchor: Date) -> [String: Checkin] {
+        monthCache[monthKey(of: anchor)] ?? [:]
+    }
+
+    private func daysInMonth(of anchor: Date) -> Int {
+        calendar.range(of: .day, in: .month, for: monthStart(of: anchor))?.count ?? 30
     }
 
     /// Empty cells before day 1, honoring the locale's first weekday.
-    private var leadingBlanks: Int {
-        let weekday = calendar.component(.weekday, from: monthStart)
+    private func leadingBlanks(of anchor: Date) -> Int {
+        let weekday = calendar.component(.weekday, from: monthStart(of: anchor))
         return (weekday - calendar.firstWeekday + 7) % 7
     }
 
@@ -127,9 +127,16 @@ struct HistoryView: View {
         calendar.isDate(monthAnchor, equalTo: .now, toGranularity: .month)
     }
 
-    private func date(day: Int) -> Date {
-        calendar.date(byAdding: .day, value: day - 1, to: monthStart) ?? monthStart
+    private func date(day: Int, of anchor: Date) -> Date {
+        calendar.date(byAdding: .day, value: day - 1, to: monthStart(of: anchor)) ?? monthStart(of: anchor)
     }
+
+    /// Always six rows, whatever the month needs. A month that fits in five
+    /// would otherwise change the page height mid-swipe, and the grid would
+    /// jump as one month replaced another.
+    private var pagerHeight: CGFloat { 6 * cellHeight + 5 * gridSpacing }
+
+    private var gridSpacing: CGFloat { 6 }
 
     // MARK: subviews
 
@@ -146,13 +153,24 @@ struct HistoryView: View {
     /// today, and a forward swipe into an empty grid reads as a bug.
     private func step(months: Int) {
         guard months < 0 || !isCurrentMonth,
-              let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else { return }
-        slideForward = months > 0
-        // One animation for both: the month slides in as the drag unwinds, so
-        // there is no frame where the grid has jumped back to centre.
-        withAnimation(.easeInOut(duration: 0.25)) {
-            monthAnchor = moved
-            dragX = 0
+              pageWidth > 0,
+              let moved = calendar.date(byAdding: .month, value: months, to: monthAnchor) else {
+            withAnimation(.spring(duration: 0.3)) { dragX = 0 }
+            return
+        }
+        // Slide the sheet a whole page, so the month already half on screen
+        // simply finishes arriving. Only once it has landed does the anchor
+        // move and the offset reset — both without animation, which puts the
+        // new month exactly where the old one was standing.
+        withAnimation(.easeInOut(duration: 0.28)) {
+            dragX = CGFloat(-months) * pageWidth
+        } completion: {
+            var settle = Transaction()
+            settle.disablesAnimations = true
+            withTransaction(settle) {
+                monthAnchor = moved
+                dragX = 0
+            }
         }
     }
 
@@ -193,33 +211,78 @@ struct HistoryView: View {
         }
     }
 
-    private var dayGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
+    /// Three months side by side — last, this, next — in a window one month
+    /// wide. Dragging moves the whole sheet, so the month you are pulling
+    /// toward is already on screen and already filled in, rather than
+    /// appearing once the swipe is over.
+    private var monthPager: some View {
+        GeometryReader { proxy in
+            let page = proxy.size.width
+            HStack(spacing: 0) {
+                dayGrid(of: shifted(-1)).frame(width: page)
+                dayGrid(of: monthAnchor).frame(width: page)
+                // Nothing to show ahead of today: the page stays blank so
+                // the resisted pull reveals an edge, not an empty calendar.
+                Group {
+                    if isCurrentMonth {
+                        Color.clear
+                    } else {
+                        dayGrid(of: shifted(1))
+                    }
+                }
+                .frame(width: page)
+            }
+            .offset(x: -page + dragX)
+            .onChange(of: page, initial: true) { _, width in pageWidth = width }
+        }
+        .frame(height: pagerHeight)
+        // The neighbours are always beside the window; this is what keeps
+        // them out of sight until they are dragged in.
+        .clipped()
+    }
+
+    private func dayGrid(of anchor: Date) -> some View {
+        let days = daysInMonth(of: anchor)
+        let blanks = leadingBlanks(of: anchor)
+        let month = checkins(of: anchor)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: gridSpacing), count: 7),
+            spacing: gridSpacing
+        ) {
             // Negative ids: LazyVGrid flattens identity across all its
             // ForEach children, so blank ids overlapping day numbers (1...)
             // silently drop those day cells.
-            ForEach(-leadingBlanks..<0, id: \.self) { _ in
+            ForEach(-blanks..<0, id: \.self) { _ in
                 Color.clear.frame(height: cellHeight)
             }
-            ForEach(1...daysInMonth, id: \.self) { day in
-                let checkin = checkins[LocalDay.string(for: date(day: day))]
-                DayCell(day: day, checkin: checkin, isToday: calendar.isDateInToday(date(day: day)))
+            ForEach(1...days, id: \.self) { day in
+                let dayDate = date(day: day, of: anchor)
+                let checkin = month[LocalDay.string(for: dayDate)]
+                DayCell(day: day, checkin: checkin, isToday: calendar.isDateInToday(dayDate))
                     .onTapGesture {
                         if let checkin { selected = checkin }
                     }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func load() async {
         errorMessage = nil
         do {
-            let first = LocalDay.string(for: monthStart)
-            let last = LocalDay.string(for: date(day: daysInMonth))
+            // All three visible months in one query: a neighbour has to be
+            // filled in before the drag starts, or the month sliding in is
+            // an empty grid. Re-run even when cached — the current month
+            // changes under you when you check in.
+            let ahead = shifted(1)
+            let first = LocalDay.string(for: monthStart(of: shifted(-1)))
+            let last = LocalDay.string(for: date(day: daysInMonth(of: ahead), of: ahead))
             let rows = try await withSkewRetry { try await CheckinRepository().mine(from: first, to: last) }
-            // Keyed by month, and refreshed even when already cached: the
-            // current month changes under you when you check in.
-            monthCache[monthKey] = Dictionary(uniqueKeysWithValues: rows.map { ($0.day, $0) })
+            // Seeded empty so a month with no check-ins is known to be
+            // loaded rather than merely missing.
+            var loaded = Dictionary(uniqueKeysWithValues: (-1...1).map { (monthKey(of: shifted($0)), [String: Checkin]()) })
+            for row in rows { loaded[String(row.day.prefix(7)), default: [:]][row.day] = row }
+            monthCache.merge(loaded) { _, fresh in fresh }
         } catch {
             // Leaving the tab cancels the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.
