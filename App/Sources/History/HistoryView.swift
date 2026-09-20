@@ -10,6 +10,10 @@ struct HistoryView: View {
     /// transition matches the direction of travel rather than always
     /// arriving from the same side.
     @State private var slideForward = true
+    /// How far the month has been dragged, live. `@GestureState` so it
+    /// falls back to zero on its own the moment the finger lifts — the
+    /// month either commits or springs back, never sticks half-way.
+    @GestureState private var dragX: CGFloat = 0
 
     private var calendar: Calendar { .current }
     private var cellHeight: CGFloat { DayCell.baseHeight * TypeScale.clamp(scale) }
@@ -27,6 +31,7 @@ struct HistoryView: View {
                 Group {
                     weekdayHeader
                     dayGrid
+                        .offset(x: dragX)
                         .id(monthKey)
                         .transition(.asymmetric(
                             insertion: .move(edge: slideForward ? .trailing : .leading),
@@ -49,15 +54,28 @@ struct HistoryView: View {
             // the color, the backdrop stays the unworn ring.
             MoodBackground(theme: .neutral)
         }
+        // Nothing to scroll when the month fits, which is the usual case —
+        // without this the view still rubber-bands vertically under a
+        // horizontal swipe, and the two gestures read as fighting.
+        .scrollBounceBehavior(.basedOnSize)
         // Swipe to flip through months, the way a calendar does. Simultaneous
-        // rather than exclusive: the scroll view still owns vertical drags,
-        // which is why this only acts on a clearly horizontal one. The
-        // chevrons stay — a gesture is not discoverable, and VoiceOver has
-        // no way to perform this one.
+        // rather than exclusive so the scroll view keeps vertical drags at
+        // accessibility text sizes, where the grid really is taller than the
+        // screen; the dominance test below is what keeps a diagonal drag
+        // from doing both at once. The chevrons stay — a gesture is not
+        // discoverable, and VoiceOver has no way to perform this one.
         .simultaneousGesture(
-            DragGesture(minimumDistance: 24)
+            DragGesture(minimumDistance: 16)
+                .updating($dragX) { drag, offset, _ in
+                    guard isHorizontal(drag.translation) else { return }
+                    // A pull toward the future drags heavily and springs
+                    // back: there is nothing ahead of today to show, and
+                    // resistance says so better than simply not moving.
+                    let travel = drag.translation.width
+                    offset = travel < 0 && isCurrentMonth ? travel / 4 : travel
+                }
                 .onEnded { drag in
-                    guard abs(drag.translation.width) > abs(drag.translation.height) else { return }
+                    guard isHorizontal(drag.translation), abs(drag.translation.width) > 60 else { return }
                     step(months: drag.translation.width < 0 ? 1 : -1)
                 }
         )
@@ -99,6 +117,13 @@ struct HistoryView: View {
     }
 
     // MARK: subviews
+
+    /// Whether a drag is for the months rather than for the scroll view.
+    /// Clearly horizontal, not merely more horizontal: a lazy diagonal
+    /// scroll should move the page and leave the month alone.
+    private func isHorizontal(_ translation: CGSize) -> Bool {
+        abs(translation.width) > abs(translation.height) * 1.5
+    }
 
     /// Moves by whole months, and is the only way the month changes — the
     /// chevrons and the swipe share it so both animate the same way and
