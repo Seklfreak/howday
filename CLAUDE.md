@@ -246,6 +246,20 @@ and window-geometry guessing; AXe needs neither.
   refresh never reshuffles the sky within a day. It is compiled into the
   test target directly (`Widgets/SkyFriend.swift`, `SkyLayout.swift`): an
   app-hosted test bundle can't `@testable import` an extension module.
+- `CheckInWidget` (`Widgets/CheckInWidget.swift`) is the lock screen:
+  circular = your ring (dashed "?" before check-in, your emoji inside an
+  arc of the day left after), rectangular = the six-mood picker before,
+  friends latest-first after. The picker's `Button(intent:)` runs
+  `CheckInIntent`, **the one write a widget makes**: the same upsert as
+  `CheckinRepository.saveToday` (duplicated there because the repository
+  sits behind Sentry tracing the widget doesn't link), no offline queue.
+  `HomeView.load()` cancels today's reminder when a row exists, which is
+  how a lock-screen check-in silences the nudge. `RootView` reloads all
+  timelines on sign-in and sign-out so a signed-out phone doesn't keep
+  showing friends' moods until the next half-hourly refresh.
+- Lock-screen widgets are added in the simulator via `axe button lock`,
+  long-press, Customize, the "ADD WIDGETS" strip, then Howday in the
+  sheet. Both accessory families render there and run the real timeline.
 - The simulator can add the widget (long-press home → Edit → Add Widget →
   search Howday, driven with AXe) and runs the real timeline with the
   app's session — emoji render as "?" boxes there, like everywhere in the

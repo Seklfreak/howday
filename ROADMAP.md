@@ -20,7 +20,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 | 4 | Offline check-in — **done** | M | medium | — |
 | 5 | Swift unit tests in CI — **done** | M | medium | — |
 | 6 | Named pushes — **done**, device check pending | M–L | high | App Group |
-| 7 | Widget — **friends sky shipped**; control, Siri, picker not built | L | high | App Group, shared session, 4 |
+| 7 | Widget — **friends sky and lock-screen check-in shipped**; control and Siri not built | L | high | App Group, shared session, 4 |
 
 ---
 

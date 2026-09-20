@@ -17,8 +17,15 @@ struct SkySnapshot: Hashable, Sendable {
     /// Your own emoji today — nil is the gate: friends' moods stay hidden.
     let mine: String?
     let friends: [SkyFriend]
+    /// The day's sixth offer for the lock-screen picker; nil when there is
+    /// no user to derive it from.
+    var wildcard: String?
 
     var friendsIn: Int { friends.filter(\.isIn).count }
+
+    /// What the lock-screen picker offers: the five suggestions and the
+    /// wildcard, as the app's own picker does.
+    var choices: [String] { MoodEmoji.suggestions + (wildcard.map { [$0] } ?? []) }
 
     static let signedOut = SkySnapshot(state: .signedOut, day: LocalDay.string(), mine: nil, friends: [])
     static let failed = SkySnapshot(state: .failed, day: LocalDay.string(), mine: nil, friends: [])
@@ -42,7 +49,7 @@ struct SkySnapshot: Hashable, Sendable {
             sample(5, "Chloé", "😢", at: 17, 48), sample(6, "Dev", nil, at: 0, 0),
             sample(7, "Mira", nil, at: 0, 0),
         ]
-        return SkySnapshot(state: .ready, day: LocalDay.string(), mine: "🙂", friends: SkySnapshot.sorted(friends))
+        return SkySnapshot(state: .ready, day: LocalDay.string(), mine: "🙂", friends: SkySnapshot.sorted(friends), wildcard: "🚀")
     }
 
     static func sorted(_ friends: [SkyFriend]) -> [SkyFriend] {
@@ -108,7 +115,10 @@ enum SkyRepository {
                     checkedInAt: row?.checkedInAt
                 )
             }
-            return SkySnapshot(state: .ready, day: day, mine: byUser[myId]?.emoji, friends: SkySnapshot.sorted(friends))
+            return SkySnapshot(
+                state: .ready, day: day, mine: byUser[myId]?.emoji, friends: SkySnapshot.sorted(friends),
+                wildcard: MoodEmoji.wildcard(for: myId, day: day)
+            )
         } catch {
             return .failed
         }

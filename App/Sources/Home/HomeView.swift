@@ -216,6 +216,10 @@ struct HomeView: View {
         let retry = Task { await flushPending() }
         do {
             confirmed = try await withSkewRetry { try await CheckinRepository().today() }?.emoji
+            // A check-in made from the lock-screen widget never passed
+            // through lockIn, so the reminder it makes redundant is
+            // cancelled here instead.
+            if confirmed != nil { ReminderScheduler.cancelToday() }
         } catch {
             // Backgrounding can cancel the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.

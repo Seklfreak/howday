@@ -151,6 +151,7 @@ targets:
       - App/Sources/Core/AppConfig.swift
       - App/Sources/Core/Supa.swift
       - App/Sources/Core/MoodTheme.swift
+      - App/Sources/Core/Mood.swift
     dependencies:
       - package: Supabase
         product: Supabase

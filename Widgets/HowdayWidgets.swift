@@ -5,6 +5,7 @@ import WidgetKit
 struct HowdayWidgetBundle: WidgetBundle {
     var body: some Widget {
         FriendsSkyWidget()
+        CheckInWidget()
     }
 }
 
