@@ -28,7 +28,7 @@ struct OnboardingView: View {
             case .notifications: notifications
             }
         }
-        .tint(MoodTheme.brand.accent)
+        .moodTheme(.brand)
     }
 
     private var contacts: some View {
@@ -76,7 +76,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button(action: perform) {
-                Text(action).frame(maxWidth: .infinity)
+                Text(action).frame(maxWidth: .infinity).onAccent()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)

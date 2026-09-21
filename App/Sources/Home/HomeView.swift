@@ -87,7 +87,7 @@ struct HomeView: View {
                 if !isLoading { Analytics.screen(selected == nil ? .home : .board) }
             }
         }
-        .tint(currentTheme.accent)
+        .moodTheme(currentTheme)
     }
 
     /// The theme everything on this screen derives from: your mood's colors

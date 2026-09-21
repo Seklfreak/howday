@@ -345,6 +345,21 @@ and window-geometry guessing; AXe needs neither.
   passes `plutil -lint` and is rejected on upload as ITMS-91056 (see
   TN3181).
 
+## Colour on the accent
+
+- **Never leave a filled button's label to `.borderedProminent`.** It writes
+  white on the tint, and every accent in the scale is a bright colour:
+  measured on screen, white on the gold is **1.53:1**, and no mood does
+  better than 2.8:1 — against the 4.5:1 body-sized text needs. `.onAccent()`
+  puts the mood's own `deep` there instead, which measures 6:1 to 10:1 on
+  the same fills. It has to sit **inside** the button's label, where it
+  beats the style's own choice; outside the button it is ignored.
+- That modifier reads `\.moodTheme`, which is why every screen sets its mood
+  with `.moodTheme(_:)` rather than `.tint(_:)`. A tint carries the accent
+  and nothing else, and the accent alone is not something you can write on.
+- A spinner inside such a button needs it too — a white `ProgressView` on
+  the gold is as invisible as the label was.
+
 ## Invites
 
 - `INVITE_URL` is a build setting in `project.yml`, not in

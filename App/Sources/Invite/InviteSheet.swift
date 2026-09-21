@@ -80,7 +80,7 @@ struct InviteSheet: View {
                     // fetched yet has no metadata to draw on.
                     preview: SharePreview("Howday", image: Image(.shareIcon))
                 ) {
-                    Text("Invite a friend").frame(maxWidth: .infinity)
+                    Text("Invite a friend").frame(maxWidth: .infinity).onAccent()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

@@ -77,7 +77,7 @@ struct RootView: View {
             }
         }
         .fontDesign(.rounded)
-        .tint(MoodTheme.brand.accent)
+        .moodTheme(.brand)
         .onChange(of: stage) {
             // The widgets show whoever is signed in — or nothing. A sign-out
             // must blank them now, not at their next half-hourly refresh,

@@ -60,8 +60,10 @@ struct BoardView<Header: View>: View {
         } description: {
             Text("Howday is contacts-based — friends appear automatically when you're in each other's contacts.")
         } actions: {
-            Button("Open Settings") {
+            Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            } label: {
+                Text("Open Settings").onAccent()
             }
             .buttonStyle(.borderedProminent)
         }
@@ -110,8 +112,12 @@ struct BoardView<Header: View>: View {
                     + "other's number saved — and they're using Howday too.")
             } actions: {
                 if Invite.url != nil {
-                    Button("Invite a friend") { openInvite(source: "empty-board") }
-                        .buttonStyle(.borderedProminent)
+                    Button {
+                        openInvite(source: "empty-board")
+                    } label: {
+                        Text("Invite a friend").onAccent()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
             }
             // ContentUnavailableView centres itself in the space it is

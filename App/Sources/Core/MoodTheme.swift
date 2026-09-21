@@ -72,3 +72,46 @@ private extension Color {
         )
     }
 }
+
+// MARK: - Carrying the mood further than a tint can
+
+private struct MoodThemeKey: EnvironmentKey {
+    static let defaultValue = MoodTheme.brand
+}
+
+extension EnvironmentValues {
+    /// The mood the screen is dressed in. A `.tint` carries the accent and
+    /// nothing else, and the accent alone is not enough to write on.
+    var moodTheme: MoodTheme {
+        get { self[MoodThemeKey.self] }
+        set { self[MoodThemeKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Dresses a screen in a mood: the tint every control reads, and the
+    /// theme behind it for the things a tint cannot say.
+    func moodTheme(_ theme: MoodTheme) -> some View {
+        environment(\.moodTheme, theme).tint(theme.accent)
+    }
+
+    /// For a label drawn on top of the accent — a filled button, chiefly.
+    ///
+    /// `.borderedProminent` writes white on the tint, and every accent in
+    /// the scale is a bright colour: white on the gold is **1.53:1**, and
+    /// never better than 2.8:1 on any of the others, against the 4.5:1 that
+    /// body-sized text needs. The mood's own `deep` is between 6:1 and 10:1
+    /// on the same fills. It has to sit inside the button's label, where it
+    /// beats the style's own choice.
+    func onAccent() -> some View {
+        modifier(OnAccentLabel())
+    }
+}
+
+private struct OnAccentLabel: ViewModifier {
+    @Environment(\.moodTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(theme.deep)
+    }
+}

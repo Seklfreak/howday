@@ -76,7 +76,7 @@ struct PhoneSignInView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
-        .tint(MoodTheme.brand.accent)
+        .moodTheme(.brand)
         .sheet(isPresented: $showCountryPicker) {
             // The picker shows, and answers to, the country actually in
             // force — which is the one a typed "+49…" carries, not the one
@@ -156,6 +156,7 @@ struct PhoneSignInView: View {
                     if isBusy { ProgressView() } else { Text("Send code") }
                 }
                 .frame(maxWidth: .infinity)
+                .onAccent()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -196,7 +197,7 @@ struct PhoneSignInView: View {
                 Group {
                     if isBusy { ProgressView() } else { Text("Verify") }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity).onAccent()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
