@@ -14,7 +14,11 @@ enum Invite {
     static var url: URL? { AppConfig.inviteURL }
 
     /// What lands in the recipient's chat, reading into the link itself.
-    static let message = "How's your day, in one emoji? That's the whole app. Here it is:"
+    ///
+    /// It makes no claim about the app, deliberately. It is a question one
+    /// friend asks another, and the link is how it gets answered — which is
+    /// also, exactly, what the app is for.
+    static let message = "How's your day, in one emoji? Tell me on here:"
 
     /// The sentence with the link on the end of it — the whole invite as one
     /// piece of text.
