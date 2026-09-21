@@ -78,11 +78,13 @@ anyone until somebody outside the app tells them about it.
   `settings`) and `invite_shared` on the share tap. Neither reports an
   outcome — iOS doesn't say whether anything was sent.
 
-**Gotcha found in testing.** `ShareLink(item: url, message:)` hands the sheet
-two items and lets each target choose: **Copy takes the message and drops the
-URL**, so the clipboard held an invite with no way to install the app. The
-link is therefore repeated inside the message text (`Invite.shareText`) as
-well as being the shared item.
+**Gotcha found in testing.** `ShareLink`'s `message:` is a second share item,
+and the sheet lets each target choose between them — which broke both ways.
+Copy took the message and dropped the URL, leaving the clipboard with an
+invite that couldn't be installed; putting the link in the message too fixed
+Copy and made Messages print it twice, once as text and once as the preview
+the attachment unfurls into. The invite is now a single `InviteItem`
+(`Transferable`, text first then URL) with no `message:` at all.
 
 **Still open.** The recipient's link preview is the beta join page's, not
 Howday's, because the invite host is a bare redirect — an OpenGraph pass on

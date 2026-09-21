@@ -353,14 +353,16 @@ and window-geometry guessing; AXe needs neither.
   friend" button with nothing behind it. `AppConfig.inviteURL` stays
   optional all the same: blank it and every entry point disappears, which
   is better than sharing a link that goes nowhere.
-- **The link is inside the message text as well as being the shared item.**
-  `ShareLink(item: url, message:)` gives the share sheet two items and lets
-  each target pick, and **Copy picks the message** — verified in the
-  simulator, and what it left on the clipboard was an invite with no way to
-  install the app. `Invite.shareText` is what fixes that; keep the URL in
-  it. Passing only a string instead loses the link-shaped sheet (the
-  `get.howday.app` header, Copy, Add to Reading List) and offers "Save to
-  Files", so both halves are load-bearing.
+- **The share sheet gets ONE item — `InviteItem` — and no `message:`.**
+  `ShareLink`'s `message:` is a *second* item, and the sheet lets every
+  target pick from the pile, which goes wrong in both directions: with the
+  link in the message as well as the URL item, Messages takes both and puts
+  it in the bubble twice; with the link only in the item, Copy takes the
+  message and leaves the clipboard holding an invite with no way to install
+  the app. Both were seen. One `Transferable` exporting text first and URL
+  second cannot do either — whatever a target picks, it gets the sentence
+  and the link, once. Don't reintroduce `message:` to "add the sentence":
+  the text representation already carries it.
 - `SharePreview("Howday", image: Image(.shareIcon))` is not decoration: a
   URL nobody has fetched has no metadata, so without it the sheet heads the
   invite with Safari's compass and the bare host. `ShareIcon` is a 256px

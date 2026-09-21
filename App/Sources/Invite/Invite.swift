@@ -1,3 +1,4 @@
+import CoreTransferable
 import Foundation
 
 /// The invite: the link handed out and the words that go with it.
@@ -16,14 +17,8 @@ enum Invite {
     static let message = "How's your day, in one emoji? That's the whole app. "
         + "Add me to your contacts and we'll see each other's day."
 
-    /// The sentence with the link inside it, which is what the share sheet
-    /// is handed as its message.
-    ///
-    /// The link is repeated here rather than left to the shared URL alone:
-    /// a share sheet gives each target its pick of the items, and Copy picks
-    /// this text — verified, and what it put on the clipboard was an invite
-    /// with no way to install the app. Targets that render the URL itself
-    /// (Messages, Mail) still get it as a link, from the item.
+    /// The sentence with the link on the end of it — the whole invite as one
+    /// piece of text.
     static func shareText(url: URL) -> String {
         "\(message) \(url.absoluteString)"
     }
@@ -35,5 +30,30 @@ enum Invite {
         case 1: "1 of your contacts is on Howday"
         default: "\(count) of your contacts are on Howday"
         }
+    }
+}
+
+/// What the share sheet is handed: the invite as words for the targets that
+/// take text, and as a link for the ones that take URLs.
+///
+/// One item, deliberately. `ShareLink`'s own `message:` is a *second* item,
+/// and the sheet lets every target pick from the pile — which went wrong in
+/// both directions. With the link in the message as well as the item,
+/// Messages took both and put it in the bubble twice; with the link only in
+/// the item, Copy took the message and left the clipboard holding an invite
+/// with no way to install the app. Two representations of one item cannot
+/// do either: whatever a target picks, it gets the sentence and the link,
+/// once.
+struct InviteItem: Transferable {
+    let url: URL
+
+    var text: String { Invite.shareText(url: url) }
+
+    static var transferRepresentation: some TransferRepresentation {
+        // Text first, so it is what a target takes unless it specifically
+        // wants a URL: the sentence is the half that makes the invite work,
+        // and a bare link loses it.
+        ProxyRepresentation(exporting: \.text)
+        ProxyRepresentation(exporting: \.url)
     }
 }
