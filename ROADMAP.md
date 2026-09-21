@@ -58,6 +58,9 @@ no action, and the "someone in your contacts joined" push cannot fire for
 anyone until somebody outside the app tells them about it.
 
 **Shipped.**
+- The message stays short and does not brief the recipient on the
+  mutual-contacts rule; `InviteSheet` tells the sender, who is the one who
+  can act on it.
 - `App/Sources/Invite/` — `Invite` (the copy, pure and tested), `InviteSheet`
   (an explainer before the share sheet: *"How a friend shows up"*, three
   steps, then `ShareLink`) and `InviteTile` (the board's dashed entry row).

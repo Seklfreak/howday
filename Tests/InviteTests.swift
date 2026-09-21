@@ -2,12 +2,12 @@ import Foundation
 import Testing
 @testable import Howday
 
-/// The invite is copy, so the copy is what's tested. The contacts sentence
-/// in particular: without it a recipient installs, lands on an empty board
-/// and has no way to find the person who invited them.
+/// The invite is copy, so the copy is what's tested.
 struct InviteTests {
-    @Test func theMessageTellsTheRecipientToSaveTheNumber() {
-        #expect(Invite.message.localizedCaseInsensitiveContains("contacts"))
+    /// The message reads into the link rather than stopping before it, so
+    /// the two have to stay punctuated to join up.
+    @Test func theMessageRunsIntoTheLink() {
+        #expect(Invite.message.hasSuffix(":"))
     }
 
     /// The one thing a share target can't do without: Copy hands over

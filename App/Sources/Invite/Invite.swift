@@ -3,19 +3,18 @@ import Foundation
 
 /// The invite: the link handed out and the words that go with it.
 ///
-/// The words are the feature. Howday has no usernames and no search, so an
-/// invite that says only "get this app" ends with two people who both
-/// installed it and still can't see each other — the recipient has to save
-/// the sender's number for the link to go both ways. That sentence is why
-/// the copy lives here, beside a test, rather than inline in a view.
+/// The words are the feature, which is why they live here beside a test
+/// rather than inline in a view. They are also all the recipient gets: the
+/// mutual-contacts rule is explained to the *sender*, in `InviteSheet`,
+/// because the sender is the one who can act on it. An invite that opens by
+/// instructing a stranger to save your number reads like a chore.
 enum Invite {
     /// `nil` when no `INVITE_URL` is configured, which hides every entry
     /// point rather than handing out a dead link.
     static var url: URL? { AppConfig.inviteURL }
 
-    /// What lands in the recipient's chat, above the link itself.
-    static let message = "How's your day, in one emoji? That's the whole app. "
-        + "Add me to your contacts and we'll see each other's day."
+    /// What lands in the recipient's chat, reading into the link itself.
+    static let message = "How's your day, in one emoji? That's the whole app. Here it is:"
 
     /// The sentence with the link on the end of it — the whole invite as one
     /// piece of text.

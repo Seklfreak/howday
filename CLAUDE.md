@@ -389,9 +389,14 @@ and window-geometry guessing; AXe needs neither.
   Howday-branded card means putting real `og:` tags on the landing page
   itself; no change on this side can do it.
 - The copy is the feature, which is why `Invite` is a pure enum next to
-  `InviteTests` rather than strings in a view. The sentence about saving
-  each other's numbers is the load-bearing half: without it people install,
-  land on an empty board, and have no way to find whoever invited them.
+  `InviteTests` rather than strings in a view. The message ends on a colon
+  and `shareText` puts the link after it — they are one sentence, so don't
+  repunctuate one without the other.
+- **The mutual-contacts rule is explained to the sender, not the
+  recipient.** `InviteSheet` is where it belongs, because the sender is the
+  one who can act on it; an invite that opens by instructing a stranger to
+  save your number reads like a chore. The message was written that way
+  once and taken back out.
 - `InviteSheet` explains before it shares. The mutual-contacts rule is the
   thing nobody guesses, and it is the *sender* who has to act on it — a
   share sheet on its own never tells them.
