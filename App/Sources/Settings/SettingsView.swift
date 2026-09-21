@@ -51,8 +51,9 @@ struct SettingsView: View {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
 
-                if let userId {
-                    Section {
+                Section {
+                    LabeledContent("Version", value: AppConfig.versionString)
+                    if let userId {
                         Button { copy(userId) } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -63,14 +64,17 @@ struct SettingsView: View {
                                 Spacer()
                                 Image(systemName: didCopyUserId ? "checkmark" : "doc.on.doc")
                             }
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                    } footer: {
-                        Text("Include this if you report a problem.")
                     }
+                } footer: {
+                    Text("Include this if you report a problem.")
                 }
+                // Both rows are diagnostics and read as one: the version is
+                // here rather than behind an About screen because this is
+                // the only place anyone goes looking for it.
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

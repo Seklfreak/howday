@@ -25,6 +25,18 @@ enum AppConfig {
         return dsn
     }
 
+    /// Marketing version and build, as "1.27.0 (412)". Shown in Settings
+    /// beside the user id: a bug report from TestFlight is close to useless
+    /// without knowing which build made it. Locally this reads the
+    /// placeholders in `project.yml`; CI passes the real pair on the
+    /// `xcodebuild` command line.
+    static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
+    }
+
     /// The install link the invite sheet hands out. Optional in the same way
     /// as the Sentry DSN: a build without it hides the invite rather than
     /// sharing a link that goes nowhere.
