@@ -1,11 +1,10 @@
 import Foundation
-import Supabase
 
 /// What a widget timeline entry carries. Friends are sorted the way the
 /// layout wants them: checked in first, most recent first, then the rest
 /// by name.
-struct SkySnapshot: Hashable, Sendable {
-    enum State: Hashable, Sendable {
+struct SkySnapshot: Hashable, Sendable, Codable {
+    enum State: String, Hashable, Sendable, Codable {
         case signedOut
         case failed
         case ready
@@ -23,6 +22,10 @@ struct SkySnapshot: Hashable, Sendable {
     /// When the board was read. Shown on the large widget so a stale sky
     /// can be told from a quiet day.
     var fetchedAt: Date = .now
+    /// True when this is the last good read rather than a fresh one. The
+    /// sky is still true, just older — but the timeline should come back
+    /// sooner than it would after a clean refresh.
+    var isStale = false
 
     var friendsIn: Int { friends.filter(\.isIn).count }
 
@@ -67,63 +70,22 @@ struct SkySnapshot: Hashable, Sendable {
     }
 }
 
-private struct MutualRow: Decodable {
-    let id: UUID
-    let phoneHash: String
+/// The last sky that loaded, kept in the App Group so a failed refresh has
+/// something true to fall back on.
+enum SkySnapshotStore {
+    private static let key = "widget.lastSnapshot"
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case phoneHash = "phone_hash"
+    private static var defaults: UserDefaults {
+        UserDefaults(suiteName: NameMap.appGroup) ?? .standard
     }
-}
 
-private struct BoardRow: Decodable {
-    let userId: UUID
-    let emoji: String
-    let checkedInAt: Date?
-
-    enum CodingKeys: String, CodingKey {
-        case emoji
-        case userId = "user_id"
-        case checkedInAt = "checked_in_at"
+    static func save(_ snapshot: SkySnapshot) {
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        defaults.set(data, forKey: key)
     }
-}
 
-/// The widget's read of the board: the same two RPCs the app's board makes,
-/// with names resolved from the map the app keeps in the App Group
-/// container rather than from Contacts, which a widget cannot read.
-///
-/// The session comes from the keychain the app writes; the widget's
-/// entitlement lists the app's keychain group first, so a token refresh
-/// made here lands where the app looks too.
-enum SkyRepository {
-    static func load() async -> SkySnapshot {
-        guard let session = try? await Supa.client.auth.session else { return .signedOut }
-        let myId = session.user.id
-        let day = LocalDay.string()
-        do {
-            async let mutuals: [MutualRow] = Supa.client.rpc("my_mutuals").execute().value
-            async let rows: [BoardRow] = Supa.client
-                .rpc("board_today", params: ["for_day": day])
-                .execute()
-                .value
-            let (links, board) = try await (mutuals, rows)
-            let byUser = Dictionary(board.map { ($0.userId, $0) }, uniquingKeysWith: { first, _ in first })
-            let friends = links.map { link in
-                let row = byUser[link.id]
-                return SkyFriend(
-                    id: link.id,
-                    name: NameMap.name(for: link.phoneHash) ?? "Friend",
-                    emoji: row?.emoji,
-                    checkedInAt: row?.checkedInAt
-                )
-            }
-            return SkySnapshot(
-                state: .ready, day: day, mine: byUser[myId]?.emoji, friends: SkySnapshot.sorted(friends),
-                wildcard: MoodEmoji.wildcard(for: myId, day: day)
-            )
-        } catch {
-            return .failed
-        }
+    static func load() -> SkySnapshot? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(SkySnapshot.self, from: data)
     }
 }

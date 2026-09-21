@@ -246,9 +246,12 @@ and window-geometry guessing; AXe needs neither.
   the notification extension does after every friend push, so the widget
   is usually fresher than its own schedule.
 - `SkyLayout` is deterministic (SplitMix64 seeded by day and size) so a
-  refresh never reshuffles the sky within a day. It is compiled into the
-  test target directly (`Widgets/SkyFriend.swift`, `SkyLayout.swift`): an
-  app-hosted test bundle can't `@testable import` an extension module.
+  refresh never reshuffles the sky within a day. It, `SkyFriend`,
+  `SkySnapshot` and `MoodEmoji` live in **`Shared/`** rather than
+  `Widgets/` for one reason: an app-hosted test bundle cannot
+  `@testable import` an extension module, so anything the tests need has
+  to reach them through the app module. `Widgets/` keeps only what needs
+  WidgetKit or Supabase.
 - `CheckInWidget` (`Widgets/CheckInWidget.swift`) is the lock screen:
   circular = your ring (dashed "?" before check-in, your emoji inside an
   arc of the day left after), rectangular = the six-mood picker before,

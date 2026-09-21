@@ -82,7 +82,12 @@ struct SkyProvider: TimelineProvider {
             let firstBoundary = (now.timeIntervalSince1970 / step).rounded(.up) * step
             var dates = [now]
             var next = Date(timeIntervalSince1970: firstBoundary)
-            while next < min(now.addingTimeInterval(2 * 60 * 60), midnight) {
+            // Two hours of drift after a clean read. After a failed one —
+            // or a fall back to the last good sky — come back in fifteen
+            // minutes instead of committing the error to the whole window.
+            let fresh = snapshot.state == .ready && !snapshot.isStale
+            let horizon = now.addingTimeInterval(fresh ? 2 * 60 * 60 : 15 * 60)
+            while next < min(horizon, midnight) {
                 dates.append(next)
                 next = next.addingTimeInterval(step)
             }

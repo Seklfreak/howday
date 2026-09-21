@@ -117,3 +117,51 @@ struct SkyLayoutTests {
         #expect(one.next() != other.next())
     }
 }
+
+/// The widget falls back to the last sky it loaded when a refresh fails, so
+/// the cache has to survive a round trip through the App Group. A silent
+/// encode or decode failure would put the error message back on the lock
+/// screen without anything failing loudly.
+struct SkySnapshotCacheTests {
+    private var snapshot: SkySnapshot {
+        SkySnapshot(
+            state: .ready, day: "2026-09-20", mine: "🙂",
+            friends: SkySnapshot.sorted([
+                SkyFriend(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                    name: "Anna", emoji: "😄",
+                    checkedInAt: Date(timeIntervalSince1970: 1_790_000_000)
+                ),
+                SkyFriend(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+                    name: "Dev", emoji: nil, checkedInAt: nil
+                ),
+            ]),
+            wildcard: "🚀"
+        )
+    }
+
+    @Test func aSnapshotSurvivesEncodingAndDecoding() throws {
+        let data = try JSONEncoder().encode(snapshot)
+        let restored = try JSONDecoder().decode(SkySnapshot.self, from: data)
+        #expect(restored.state == .ready)
+        #expect(restored.day == snapshot.day)
+        #expect(restored.mine == "🙂")
+        #expect(restored.wildcard == "🚀")
+        #expect(restored.friends.map(\.name) == ["Anna", "Dev"])
+        #expect(restored.friends.first?.emoji == "😄")
+        #expect(restored.friendsIn == 1)
+    }
+
+    /// The fallback is only allowed to show today's sky. Yesterday's moods
+    /// presented as today's would be worse than the error it replaces.
+    @Test func staleIsCarriedSeparatelyFromTheDay() throws {
+        var cached = try JSONDecoder().decode(
+            SkySnapshot.self, from: try JSONEncoder().encode(snapshot)
+        )
+        #expect(cached.isStale == false)
+        cached.isStale = true
+        #expect(cached.day == "2026-09-20")
+        #expect(cached.state == .ready)
+    }
+}
