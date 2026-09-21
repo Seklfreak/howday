@@ -53,7 +53,7 @@ struct CheckinRepository {
                 userId: userId,
                 day: LocalDay.string(),
                 emoji: emoji,
-                updatedAt: ISO8601DateFormatter().string(from: .now)
+                updatedAt: Date.now.storedTimestamp
             )
             try await Supa.client
                 .from("checkins")

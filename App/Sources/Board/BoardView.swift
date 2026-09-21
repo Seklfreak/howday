@@ -15,6 +15,7 @@ struct BoardView<Header: View>: View {
     @ViewBuilder let header: Header
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var board = BoardState()
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -54,9 +55,7 @@ struct BoardView<Header: View>: View {
             Text("Howday is contacts-based — friends appear automatically when you're in each other's contacts.")
         } actions: {
             Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -238,6 +237,8 @@ private struct LimitedContactsBanner: View {
 private struct BoardCard: View {
     let entry: BoardEntry
 
+    @Environment(\.openURL) private var openURL
+
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     private var avatarSize: CGFloat { 56 * TypeScale.clamp(scale) }
@@ -257,7 +258,7 @@ private struct BoardCard: View {
         if let messageURL {
             Button {
                 Analytics.track("friend_tapped")
-                UIApplication.shared.open(messageURL)
+                openURL(messageURL)
             } label: {
                 card
             }

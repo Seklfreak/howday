@@ -65,12 +65,17 @@ struct CheckinDetailSheet: View {
     /// month abbreviated at the accessibility sizes, where the sheet's
     /// fixed height leaves the full form one truncated line.
     private var dateText: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: checkin.day) else { return checkin.day }
+        guard let date = try? Date(checkin.day, strategy: Self.storedDay) else { return checkin.day }
         let month: Date.FormatStyle.Symbol.Month = dynamicTypeSize.isAccessibilitySize ? .abbreviated : .wide
         return date.formatted(.dateTime.weekday(.wide).month(month).day())
     }
+
+    /// The shape `checkins.day` is stored in. A parse strategy rather than a
+    /// `DateFormatter`: this is read inside `body`, and building a formatter
+    /// there costs ~80µs every time the sheet lays out (see `LocalDay`).
+    private static let storedDay = Date.ISO8601FormatStyle(
+        dateSeparator: .dash, timeZone: .current
+    ).year().month().day()
 
     var body: some View {
         VStack(spacing: 16) {

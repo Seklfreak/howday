@@ -43,3 +43,11 @@ enum LocalDay {
         cache.string(for: date)
     }
 }
+
+extension Date {
+    /// The timestamp `checkins.updated_at` is written with. `.iso8601` is a
+    /// format style, so unlike `ISO8601DateFormatter()` it allocates
+    /// nothing per save — and the app and the widget send the identical
+    /// shape, which matters because either may write the same row.
+    var storedTimestamp: String { formatted(.iso8601) }
+}

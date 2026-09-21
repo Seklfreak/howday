@@ -58,8 +58,11 @@ and window-geometry guessing; AXe needs neither.
 - A simulator that suddenly shows the sign-in screen after a test run is
   the unsigned test host: `xcodebuild test … CODE_SIGNING_ALLOWED=NO`
   installs an unsigned Howday.app over the signed one, and unsigned
-  binaries can't read the keychain. Reinstall a signed build; the session
-  is still there.
+  binaries can't read the keychain. It also leaves that unsigned product
+  in the shared `-derivedDataPath`, so installing from there again just
+  reinstalls it — **rebuild without the flag first**, then install. Signing
+  in on the unsigned app appears to work and then reports "Auth session
+  missing", which is the same fault wearing a different face.
 
 ## Supabase / data model
 

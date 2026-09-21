@@ -24,6 +24,30 @@ struct LocalDayTests {
         #expect(LocalDay.string(for: date(2026, 9, 20, hour: 0, minute: 0, second: 0)) == "2026-09-20")
     }
 
+    /// The history sheet parses `checkins.day` back with this exact style.
+    /// Written and read in two different files, so the pairing is worth
+    /// holding down: a mismatch shows the raw "2026-09-20" to the user.
+    @Test func theStoredDayParsesBackWithTheSheetsStyle() {
+        let style = Date.ISO8601FormatStyle(dateSeparator: .dash, timeZone: .current).year().month().day()
+        for day in [date(2026, 9, 20), date(2026, 1, 1), date(2026, 12, 31)] {
+            let stored = LocalDay.string(for: day)
+            let parsed = try? Date(stored, strategy: style)
+            #expect(parsed != nil, "\(stored)")
+            #expect(parsed.map { LocalDay.string(for: $0) } == stored, "\(stored)")
+        }
+    }
+
+    /// What `checkins.updated_at` is written with by both the app and the
+    /// widget — the server rejects anything it can't read as a timestamp.
+    @Test func theStoredTimestampIsISO8601() {
+        let moment = Date(timeIntervalSince1970: 1_790_000_000)
+        let text = moment.storedTimestamp
+        #expect(text.hasSuffix("Z"), "\(text)")
+        let parsed = try? Date(text, strategy: .iso8601)
+        #expect(parsed != nil, "\(text)")
+        #expect(abs(parsed?.timeIntervalSince(moment) ?? .infinity) < 1)
+    }
+
     /// The keys sort as dates, which the reminder planner and the queue's
     /// expiry both rely on.
     @Test func keysSortChronologically() {
