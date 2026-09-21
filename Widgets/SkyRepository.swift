@@ -32,6 +32,10 @@ private struct BoardRow: Decodable {
 /// made here lands where the app looks too.
 enum SkyRepository {
     static func load() async -> SkySnapshot {
+        // What the app last read, when it is seconds old. Not only cheaper:
+        // a widget refresh usually runs on a locked phone with the radio
+        // asleep, and the round trip is the part of it that fails.
+        if let published = SkySnapshotStore.load(), published.isFresh { return published }
         guard let session = try? await Supa.client.auth.session else { return .signedOut }
         let myId = session.user.id
         let day = LocalDay.string()

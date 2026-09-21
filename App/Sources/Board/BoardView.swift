@@ -2,7 +2,6 @@ import ContactsUI
 import Supabase
 import SwiftUI
 import UIKit
-import WidgetKit
 
 /// The friends board, embedded below the mood bar on the home screen.
 /// HomeView only mounts it once today's check-in exists, so the old
@@ -138,8 +137,9 @@ struct BoardView<Header: View>: View {
         do {
             board = try await withTrace("board.load") { try await withSkewRetry { try await BoardRepository().load() } }
             errorMessage = nil
-            // Whatever the board just learned, the widget should show too.
-            WidgetCenter.shared.reloadAllTimelines()
+            // Whatever the board just learned, the widget should show too —
+            // but only if it *is* something new. See WidgetSync.
+            WidgetSync.publish(board)
         } catch {
             // Leaving the tab cancels the .task mid-request; don't show
             // that as an error — reappearing restarts the load anyway.

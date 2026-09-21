@@ -6,10 +6,16 @@ struct Checkin: Codable, Identifiable, Sendable, Equatable {
     let userId: UUID
     let day: String
     var emoji: String
+    /// When the check-in was made. Only `board_today` returns it; the plain
+    /// select leaves it nil. The widget lays friends out along the day with
+    /// it, so the app has to carry it into the snapshot it publishes rather
+    /// than dropping it on the floor the way it used to.
+    var checkedInAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, day, emoji
         case userId = "user_id"
+        case checkedInAt = "checked_in_at"
     }
 }
 

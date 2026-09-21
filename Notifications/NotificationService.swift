@@ -1,3 +1,4 @@
+import Foundation
 import OSLog
 import UserNotifications
 import WidgetKit
@@ -36,9 +37,16 @@ final class NotificationService: UNNotificationServiceExtension {
             Self.log.info("no sender hash in payload; generic body kept")
         }
         // A friend's check-in is exactly what the widget shows: refresh it
-        // now rather than at the next half-hour tick.
+        // now rather than at the next half-hour tick. What the app last
+        // published predates this push, so it must not be served in place
+        // of the read.
+        SkySnapshotStore.invalidate()
         WidgetCenter.shared.reloadAllTimelines()
-        contentHandler(content)
+        // Calling the handler is what lets iOS tear this process down, and
+        // the reload is a message to the widget daemon that has to leave
+        // first. A fifth of a second is imperceptible on a banner and is
+        // the difference between a request sent and one lost with us.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { contentHandler(content) }
     }
 
     /// iOS gives the extension about 30 seconds; a file read never gets

@@ -29,6 +29,28 @@ struct SkySnapshot: Hashable, Sendable, Codable {
 
     var friendsIn: Int { friends.filter(\.isIn).count }
 
+    /// How long a stored snapshot stands in for a fetch. The app publishes
+    /// the board it has just read, so a reload that follows one arrives to
+    /// a sky seconds old and need not make the round trip itself.
+    static let freshFor: TimeInterval = 90
+
+    /// Whether this snapshot can be served instead of reading the board.
+    /// Stale is excluded on purpose: that flag is how the app and the push
+    /// extension say "something changed that I have not read yet".
+    var isFresh: Bool {
+        state == .ready && !isStale && day == LocalDay.string()
+            && fetchedAt.timeIntervalSinceNow > -Self.freshFor
+    }
+
+    /// Whether a viewer would see the same thing. `fetchedAt` is
+    /// deliberately not part of it — a fresh read of an unchanged board is
+    /// exactly the case that must not spend a reload.
+    func showsSameAs(_ other: SkySnapshot?) -> Bool {
+        guard let other else { return false }
+        return state == other.state && day == other.day && mine == other.mine
+            && friends == other.friends && wildcard == other.wildcard
+    }
+
     /// What the lock-screen picker offers: the five suggestions and the
     /// wildcard, as the app's own picker does.
     var choices: [String] { MoodEmoji.suggestions + (wildcard.map { [$0] } ?? []) }
@@ -88,4 +110,17 @@ enum SkySnapshotStore {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(SkySnapshot.self, from: data)
     }
+
+    /// Mark what is stored as behind the truth, so the next refresh reads
+    /// the board instead of serving this. It stays as the fallback if that
+    /// read fails — older than the truth still beats an error.
+    static func invalidate() {
+        guard var snapshot = load() else { return }
+        snapshot.isStale = true
+        save(snapshot)
+    }
+
+    /// Sign-out takes the sky with it, or the widget keeps drawing a
+    /// friend's mood for whoever picks the phone up next.
+    static func clear() { defaults.removeObject(forKey: key) }
 }

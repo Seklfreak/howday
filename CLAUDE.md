@@ -241,10 +241,28 @@ and window-geometry guessing; AXe needs neither.
   its own (`AppConfig` reads `Bundle.main`, which is the appex bundle); the
   TestFlight archive's command-line settings reach every target, so the
   same secrets populate it.
-- Timeline: one entry, `.after(min(30 min, midnight))`; the app reloads all
-  timelines after a check-in save/drain and after every board fetch, and
-  the notification extension does after every friend push, so the widget
-  is usually fresher than its own schedule.
+- **Never call `WidgetCenter.reloadAllTimelines()` from the app — go
+  through `WidgetSync`.** Every request draws on the same daily refresh
+  budget iOS gives a widget, and the ones carrying nothing new are what
+  push the ones that matter past it; a friend's push arriving on a spent
+  budget is a widget that does not refresh at all. The board used to ask
+  on *every* read — each appear, each pull, each realtime event, identical
+  board or not. `WidgetSync.publish` now writes the board into the App
+  Group (`SkySnapshotStore`) and reloads only when `showsSameAs` says a
+  viewer would see something different.
+- That store is also what the widget reads: `SkyRepository.load` serves a
+  published snapshot up to `SkySnapshot.freshFor` (90s) old instead of
+  making its own round trip, which matters because a refresh usually runs
+  on a locked phone where the round trip is the part that fails. **So
+  anything that changes the board without reading it back must
+  `invalidate()` first** — your own check-in, the queue draining, the
+  lock-screen intent, a friend's push — or the widget serves the sky from
+  before the change. Sign-out must `clear()` it, or the next person to
+  pick the phone up still sees a friend's mood.
+- The push extension calls the handler a fifth of a second after the
+  reload: handing back the content is what lets iOS tear the process down,
+  and the reload is a message to the widget daemon that has to leave
+  first.
 - `SkyLayout` is deterministic (SplitMix64 seeded by day and size) so a
   refresh never reshuffles the sky within a day. It, `SkyFriend`,
   `SkySnapshot` and `MoodEmoji` live in **`Shared/`** rather than

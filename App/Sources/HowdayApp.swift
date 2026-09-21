@@ -1,7 +1,6 @@
 import Sentry
 import Supabase
 import SwiftUI
-import WidgetKit
 
 @main
 struct HowdayApp: App {
@@ -83,7 +82,8 @@ struct RootView: View {
             // The widgets show whoever is signed in — or nothing. A sign-out
             // must blank them now, not at their next half-hourly refresh,
             // and a sign-in should fill them without waiting for the board.
-            if stage == .ready || stage == .signedOut { WidgetCenter.shared.reloadAllTimelines() }
+            if stage == .signedOut { WidgetSync.signedOut() }
+            if stage == .ready { WidgetSync.invalidate() }
             // Every launch that reaches the signed-in UI re-registers, so a
             // rotated APNs token is re-uploaded without any bookkeeping.
             if stage == .ready {

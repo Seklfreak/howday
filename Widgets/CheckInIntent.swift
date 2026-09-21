@@ -36,6 +36,9 @@ struct CheckInIntent: AppIntent {
             .from("checkins")
             .upsert(payload, onConflict: "user_id,day", returning: .minimal)
             .execute()
+        // The board this just changed has not been read back here, so the
+        // stored sky must not stand in for the refresh that follows.
+        SkySnapshotStore.invalidate()
         WidgetCenter.shared.reloadAllTimelines()
         // Counted the same way the app counts its own, so the two are
         // comparable; the emoji stays out of it, as everywhere else.

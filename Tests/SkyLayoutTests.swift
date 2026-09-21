@@ -165,3 +165,51 @@ struct SkySnapshotCacheTests {
         #expect(cached.state == .ready)
     }
 }
+
+/// The two decisions that keep the widget fresh without burning the reload
+/// budget: whether a stored sky may stand in for a read, and whether a read
+/// is worth a reload at all. Both are quiet when wrong — a widget that
+/// never updates, or one that updates until iOS stops listening.
+struct SkyFreshnessTests {
+    private func sky(mine: String? = "🙂", friends: [SkyFriend] = []) -> SkySnapshot {
+        SkySnapshot(state: .ready, day: LocalDay.string(), mine: mine, friends: friends, wildcard: "🚀")
+    }
+
+    private func friend(_ name: String, _ emoji: String?) -> SkyFriend {
+        SkyFriend(id: UUID(uuidString: "00000000-0000-0000-0000-00000000000\(name.count)")!,
+                  name: name, emoji: emoji, checkedInAt: emoji == nil ? nil : Date(timeIntervalSince1970: 1_790_000_000))
+    }
+
+    @Test func aJustPublishedSkyStandsInForARead() {
+        #expect(sky().isFresh)
+    }
+
+    @Test func staleNeverStandsIn() {
+        var snapshot = sky()
+        snapshot.isStale = true
+        #expect(!snapshot.isFresh)
+    }
+
+    @Test func anOldOrYesterdaysSkyNeverStandsIn() {
+        var aged = sky()
+        aged.fetchedAt = .now.addingTimeInterval(-(SkySnapshot.freshFor + 1))
+        #expect(!aged.isFresh)
+        var yesterday = SkySnapshot(state: .ready, day: "2000-01-01", mine: "🙂", friends: [])
+        yesterday.fetchedAt = .now
+        #expect(!yesterday.isFresh)
+    }
+
+    @Test func aRereadOfTheSameBoardIsNotWorthAReload() {
+        var earlier = sky(friends: [friend("Anna", "😄")])
+        earlier.fetchedAt = .now.addingTimeInterval(-300)
+        #expect(sky(friends: [friend("Anna", "😄")]).showsSameAs(earlier))
+    }
+
+    @Test func aChangedMoodOrANewFriendIs() {
+        let earlier = sky(friends: [friend("Anna", "😄")])
+        #expect(!sky(friends: [friend("Anna", "😢")]).showsSameAs(earlier))
+        #expect(!sky(friends: [friend("Anna", "😄"), friend("Bo", nil)]).showsSameAs(earlier))
+        #expect(!sky(mine: nil, friends: [friend("Anna", "😄")]).showsSameAs(earlier))
+        #expect(!sky().showsSameAs(nil))
+    }
+}
