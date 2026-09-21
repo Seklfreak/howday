@@ -24,4 +24,15 @@ enum AppConfig {
         }
         return dsn
     }
+
+    /// The install link the invite sheet hands out. Optional in the same way
+    /// as the Sentry DSN: a build without it hides the invite rather than
+    /// sharing a link that goes nowhere.
+    static var inviteURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "INVITE_URL") as? String,
+              let url = URL(string: raw), url.host != nil else {
+            return nil
+        }
+        return url
+    }
 }

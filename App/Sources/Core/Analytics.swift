@@ -22,6 +22,7 @@ enum Analytics {
         case home
         case board
         case history
+        case invite
         case settings
         case reminder
 
@@ -33,6 +34,7 @@ enum Analytics {
             case .home: "Mood picker"
             case .board: "Friends board"
             case .history: "History"
+            case .invite: "Invite"
             case .settings: "Settings"
             case .reminder: "Daily reminder"
             }

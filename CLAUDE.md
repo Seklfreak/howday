@@ -345,6 +345,47 @@ and window-geometry guessing; AXe needs neither.
   passes `plutil -lint` and is rejected on upload as ITMS-91056 (see
   TN3181).
 
+## Invites
+
+- `INVITE_URL` is a build setting in `project.yml`, not in
+  `Config/Secrets.xcconfig`. It is a public link rather than a credential,
+  and putting it behind a CI secret only adds a way to ship an "Invite a
+  friend" button with nothing behind it. `AppConfig.inviteURL` stays
+  optional all the same: blank it and every entry point disappears, which
+  is better than sharing a link that goes nowhere.
+- **The link is inside the message text as well as being the shared item.**
+  `ShareLink(item: url, message:)` gives the share sheet two items and lets
+  each target pick, and **Copy picks the message** — verified in the
+  simulator, and what it left on the clipboard was an invite with no way to
+  install the app. `Invite.shareText` is what fixes that; keep the URL in
+  it. Passing only a string instead loses the link-shaped sheet (the
+  `get.howday.app` header, Copy, Add to Reading List) and offers "Save to
+  Files", so both halves are load-bearing.
+- `SharePreview("Howday", image: Image(.shareIcon))` is not decoration: a
+  URL nobody has fetched has no metadata, so without it the sheet heads the
+  invite with Safari's compass and the bare host. `ShareIcon` is a 256px
+  copy of the app icon — the real `AppIcon` asset can't be loaded as an
+  `Image` at runtime.
+- **What the recipient's link preview says is not the app's to decide.** The
+  invite host is a bare redirect to the beta join page, so Messages follows
+  it and renders *that* page's OpenGraph tags. Giving the recipient a
+  Howday-branded card means putting real `og:` tags on the landing page
+  itself; no change on this side can do it.
+- The copy is the feature, which is why `Invite` is a pure enum next to
+  `InviteTests` rather than strings in a view. The sentence about saving
+  each other's numbers is the load-bearing half: without it people install,
+  land on an empty board, and have no way to find whoever invited them.
+- `InviteSheet` explains before it shares. The mutual-contacts rule is the
+  thing nobody guesses, and it is the *sender* who has to act on it — a
+  share sheet on its own never tells them.
+- Three entry points, all opening the same sheet: the empty board's action,
+  a tile under the board's grid (the one that survives the board filling
+  up), and Settings' "Friends" section. Each passes its own `source` to
+  `invite_opened`; those raw values are schema, like `WidgetSource`.
+- Settings' contact count comes from `ContactDirectory.mutualCount()`,
+  which is server-side only — it is right even with contacts access off,
+  where the board itself can show nothing.
+
 ## Onboarding & permissions
 
 - Sign-in takes a **country + national number**, never a typed `+code`:

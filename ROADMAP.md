@@ -15,7 +15,7 @@ minor; ship the invisible ones (tests, offline queue) as patches whenever.
 | # | Item | Effort | Leverage | Depends on |
 |---|------|--------|----------|------------|
 | 1 | Dynamic Type pass — **done** | S | low | — |
-| 2 | Invite share sheet | S | **highest** | — |
+| 2 | Invite share sheet — **done** | S | **highest** | — |
 | 3 | Limited contacts access (iOS 18) — **done** | S | medium | — |
 | 4 | Offline check-in — **done** | M | medium | — |
 | 5 | Swift unit tests in CI — **done** | M | medium | — |
@@ -49,7 +49,7 @@ accessibility variants), one screenshot per screen.
 **Decisions.** None. Do it before the App Store submission; reviewers do test
 this.
 
-## 2. Invite share sheet — S
+## 2. Invite share sheet — S — done
 
 **Problem.** The social graph grows only when two people have each other's
 numbers *and* both install the app. There is no way to cause the second half
@@ -57,25 +57,39 @@ from inside the app: a new user who checks in lands on "No friends yet" with
 no action, and the "someone in your contacts joined" push cannot fire for
 anyone until somebody outside the app tells them about it.
 
-**Approach.**
-- A `ShareLink` with the install link and a short text that says what the
-  recipient actually has to do: *"I'm on Howday — a one-tap daily mood
-  check-in. Add me to your contacts and we'll see each other's day:
-  <link>"*. The contacts sentence matters; without it people install, see an
-  empty board and leave.
-- The link comes from an `INVITE_URL` build setting in the xcconfig, same
-  pattern as `UMAMI_URL`: the public TestFlight link now, the App Store URL
-  after launch, with no code change between the two.
-- Three placements: the "No friends yet" `ContentUnavailableView` gets it as
-  its action, Settings gets an "Invite friends" row at the top, and the
-  board's toolbar or header gets a small persistent entry so it is still
-  reachable once the board has people on it.
-- Track `invite_shared` in Umami (the tap, not the outcome — iOS does not
-  reliably report completion).
+**Shipped.**
+- `App/Sources/Invite/` — `Invite` (the copy, pure and tested), `InviteSheet`
+  (an explainer before the share sheet: *"How a friend shows up"*, three
+  steps, then `ShareLink`) and `InviteTile` (the board's dashed entry row).
+- Three placements, all opening the explainer: the "No friends yet"
+  `ContentUnavailableView`'s action, a full-width tile under the board's grid
+  so it survives the board filling up, and a "Friends" section at the top of
+  Settings — which also answers *"is anyone here yet?"* with
+  `Invite.contactsSummary` over a `my_mutuals()` count.
+- The explainer was not in the original plan and earns its place: the sender
+  is the one who has to act on the mutual-contacts rule, and a share sheet
+  alone never tells them.
+- `INVITE_URL` is a build setting in `project.yml`, **not** the xcconfig as
+  planned here: it is a public link, not a secret, and routing it through a
+  CI secret only creates a way to ship an "Invite a friend" button with
+  nothing behind it. `AppConfig.inviteURL` is still optional, so a build that
+  blanks it hides every entry point rather than sharing a dead link.
+- Events: `invite_opened` with a `source` (`empty-board` / `board` /
+  `settings`) and `invite_shared` on the share tap. Neither reports an
+  outcome — iOS doesn't say whether anything was sent.
 
-**Decisions.** Whether the last onboarding screen should end on the share
-sheet too. Probably yes once the App Store link exists, probably not while it
-is a TestFlight link that asks the recipient to install TestFlight first.
+**Gotcha found in testing.** `ShareLink(item: url, message:)` hands the sheet
+two items and lets each target choose: **Copy takes the message and drops the
+URL**, so the clipboard held an invite with no way to install the app. The
+link is therefore repeated inside the message text (`Invite.shareText`) as
+well as being the shared item.
+
+**Still open.** The recipient's link preview is the beta join page's, not
+Howday's, because the invite host is a bare redirect — an OpenGraph pass on
+that landing page is what the design's message card actually needs, and it
+is not a change to this repo. Also: whether the last onboarding screen
+should end on the share sheet too — probably yes once the App Store link exists, probably not while
+it is a TestFlight link that asks the recipient to install TestFlight first.
 
 ## 3. Limited contacts access (iOS 18) — S — done
 
@@ -255,7 +269,7 @@ place for the tap is the home screen and the lock screen.
 1. **Patch releases, any order:** 5 (tests), 4 (offline queue), 1 (Dynamic
    Type).
 2. **One minor release:** 2 (invite) + 3 (limited contacts), the two
-   user-visible small items, so they share one Beta App Review.
+   user-visible small items, so they share one Beta App Review. — done
 3. **One minor release:** 6 (named pushes). Does the App Group and CI
    profile work that 7 reuses.
 4. **One minor release:** 7 (widget picker, lock screen, control, Siri);

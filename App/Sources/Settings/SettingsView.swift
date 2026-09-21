@@ -9,10 +9,21 @@ struct SettingsView: View {
     @State private var errorMessage: String?
     @State private var userId: String?
     @State private var didCopyUserId = false
+    @State private var showInvite = false
+    /// How many mutual contacts the server links to this account; nil until
+    /// it loads, and on failure it stays nil rather than showing a wrong "0".
+    @State private var mutualCount: Int?
 
     var body: some View {
         NavigationStack {
             Form {
+                // Guarded as a whole: with no invite link configured and
+                // the count not (yet) loaded, the section would be a header
+                // with nothing under it.
+                if Invite.url != nil || mutualCount != nil {
+                    friends
+                }
+
                 Section {
                     NavigationLink("Daily reminder") {
                         ReminderSettingsView()
@@ -72,9 +83,52 @@ struct SettingsView: View {
             } message: {
                 Text("This cannot be undone.")
             }
+            .sheet(isPresented: $showInvite) { InviteSheet() }
+            .onChange(of: showInvite) {
+                // Same reason HomeView re-reports on closing this sheet:
+                // nothing fires underneath a dismissal, so actions taken
+                // afterwards would be filed under /invite.
+                if !showInvite { Analytics.screen(.settings) }
+            }
             .onAppear { Analytics.screen(.settings) }
             .task {
                 userId = try? await Supa.client.auth.session.user.id.uuidString
+                // Server-side, so it is right even with contacts access off.
+                mutualCount = try? await ContactDirectory.mutualCount()
+            }
+        }
+    }
+
+    /// The invite lives at the top because it is the only thing in Settings
+    /// that grows the board; the count under it is what makes an empty board
+    /// legible ("nobody yet" rather than "something is broken").
+    private var friends: some View {
+        Section("Friends") {
+            if Invite.url != nil {
+                Button {
+                    Analytics.track("invite_opened", ["source": "settings"])
+                    showInvite = true
+                } label: {
+                    HStack {
+                        Label("Invite a friend", systemImage: "person.badge.plus")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            if let mutualCount {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Contacts")
+                        Text(Invite.contactsSummary(count: mutualCount))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "person.2")
+                }
             }
         }
     }

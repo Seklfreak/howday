@@ -13,7 +13,7 @@ redistribution.
 ## Repo layout
 
 - `project.yml` — XcodeGen definition; the `.xcodeproj` is generated, not committed
-- `App/Sources/` — SwiftUI app, one folder per feature (Auth, CheckIn, Board, History, Core)
+- `App/Sources/` — SwiftUI app, one folder per feature (Auth, CheckIn, Board, History, Invite, Core)
 - `Config/Secrets.xcconfig` — Supabase URL + anon key, Sentry DSN, Umami host (gitignored; copy from `Secrets.example.xcconfig`)
 - `App/PrivacyInfo.xcprivacy` — privacy manifest: what the app collects and why it touches `UserDefaults`
 - `supabase/migrations/` — schema + RLS, applied with the Supabase CLI

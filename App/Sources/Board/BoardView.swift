@@ -22,6 +22,7 @@ struct BoardView<Header: View>: View {
     /// Set while contacts access is iOS 18 "limited": how many contacts the
     /// app can see, for the banner offering to add more. nil otherwise.
     @State private var limitedContactCount: Int?
+    @State private var showInvite = false
     @ScaledMetric(relativeTo: .largeTitle) private var scale: CGFloat = 1
 
     var body: some View {
@@ -37,6 +38,12 @@ struct BoardView<Header: View>: View {
         }
         .task { await listenForChanges() }
         .refreshable { await load(forceSync: true) }
+        .sheet(isPresented: $showInvite) { InviteSheet() }
+        .onChange(of: showInvite) {
+            // Dismissing a sheet fires no onAppear underneath it, so without
+            // this every tap after closing the invite is filed under /invite.
+            if !showInvite { Analytics.screen(.board) }
+        }
         .onChange(of: scenePhase) {
             // Coming back to the foreground: the socket may have dropped
             // and missed events are never replayed — refetch. This is
@@ -76,20 +83,37 @@ struct BoardView<Header: View>: View {
             .padding(.horizontal)
             .padding(.top, 8)
         }
-        // The minimum card width grows with the text, so the grid drops to
-        // one column at the accessibility sizes instead of squeezing names.
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150 * TypeScale.clamp(scale)), spacing: 12)], spacing: 12) {
-            ForEach(board.entries) { entry in
-                BoardCard(entry: entry)
+        // Grid and tile in one stack so the tile sits a card's gap below the
+        // last row — outside it, the grid's own padding doubled up and the
+        // tile drifted away from the board it belongs to.
+        VStack(spacing: 12) {
+            // The minimum card width grows with the text, so the grid drops to
+            // one column at the accessibility sizes instead of squeezing names.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150 * TypeScale.clamp(scale)), spacing: 12)], spacing: 12) {
+                ForEach(board.entries) { entry in
+                    BoardCard(entry: entry)
+                }
+            }
+            if !board.entries.isEmpty, Invite.url != nil {
+                // The one entry point that survives the board filling up,
+                // which is exactly when someone stops looking for a way to
+                // add the next person.
+                InviteTile { openInvite(source: "board") }
             }
         }
         .padding()
         if board.entries.isEmpty {
-            ContentUnavailableView(
-                "No friends yet",
-                systemImage: "person.2",
-                description: Text("Friends appear automatically once you and they have each other in your contacts.")
-            )
+            ContentUnavailableView {
+                Label("No friends yet", systemImage: "person.2")
+            } description: {
+                Text("Howday has no usernames. A friend shows up here once the two of you have each "
+                    + "other's number saved — and they're using Howday too.")
+            } actions: {
+                if Invite.url != nil {
+                    Button("Invite a friend") { openInvite(source: "empty-board") }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
             // ContentUnavailableView centres itself in the space it is
             // given, and inside a scroll view that is only its own height.
             .frame(minHeight: 280)
@@ -97,6 +121,11 @@ struct BoardView<Header: View>: View {
         if let errorMessage {
             Text(errorMessage).foregroundStyle(.red).font(.footnote)
         }
+    }
+
+    private func openInvite(source: String) {
+        Analytics.track("invite_opened", ["source": source])
+        showInvite = true
     }
 
     private func load(forceSync: Bool = false) async {

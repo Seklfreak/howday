@@ -48,6 +48,18 @@ enum ContactDirectory {
         return Set(index.values.map(\.identifier)).count
     }
 
+    /// How many mutual contacts the server links to this account — Settings'
+    /// "3 of your contacts are on Howday". Server-side only: it reads no
+    /// address book, so the number is still right with contacts access off,
+    /// where the board itself can show nothing.
+    static func mutualCount() async throws -> Int {
+        let mutuals: [MutualRow] = try await Supa.client
+            .rpc("my_mutuals")
+            .execute()
+            .value
+        return mutuals.count
+    }
+
     /// The address book changed under the app's feet — after the limited
     /// access picker adds contacts, for one. The system posts
     /// CNContactStoreDidChange for that too, but not before the picker's
@@ -348,49 +360,5 @@ enum ContactDirectory {
             }
             return index
         }.value
-    }
-
-    /// Candidate E.164-without-plus forms for a raw contact number. We can't
-    /// fully parse national formats without a phone-number library, so we
-    /// hash a small candidate set — extra candidates are harmless because
-    /// matching is exact, and a guess at the wrong country just produces a
-    /// hash nothing matches.
-    ///
-    /// A number saved the way it is dialled at home ("0176 1234567") carries
-    /// no calling code, so it can only be matched by supplying one — which is
-    /// what `homeDial` is for. Outside the US that national form is how most
-    /// people save most numbers, and every one of them used to miss.
-    static func candidates(for raw: String, homeDial: Int) -> [String] {
-        let digits = raw.filter(\.isNumber)
-        guard digits.count >= 7 else { return [] }
-        var result: Set<String> = []
-        if raw.trimmingCharacters(in: .whitespaces).hasPrefix("+") {
-            result.insert(digits)
-        } else if digits.hasPrefix("00") {
-            result.insert(String(digits.dropFirst(2)))
-        } else if digits.hasPrefix("0") {
-            // A trunk prefix, so this is national form and nothing else: no
-            // calling code starts with 0, so the digits as written can never
-            // equal a stored number and aren't worth hashing.
-            insert(national: digits, dial: homeDial, into: &result)
-        } else {
-            // Ambiguous — either international with the + left off ("49176…")
-            // or national in a country that has no trunk prefix (every US
-            // number, and a German one saved as "176…"). Both get a candidate.
-            result.insert(digits)
-            insert(national: digits, dial: homeDial, into: &result)
-        }
-        return Array(result)
-    }
-
-    /// Add `<calling code><national digits>` for a number read as national
-    /// form. A length we know contradicts that reading is dropped rather than
-    /// hashed: seven digits under +1 is a local number saved without its area
-    /// code, and prefixing it only invents a number nobody has.
-    private static func insert(national digits: String, dial: Int, into result: inout Set<String>) {
-        let national = PhoneNumber.nationalDigits(digits)
-        if let expected = PhoneNumber.nationalDigitCount(forDial: dial), national.count != expected { return }
-        guard national.count + String(dial).count <= 15 else { return }
-        result.insert("\(dial)\(national)")
     }
 }

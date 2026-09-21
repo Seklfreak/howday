@@ -49,6 +49,12 @@ targets:
         # runs) uses the APNs sandbox; Release/TestFlight uses production.
         # PushRegistrar's #if DEBUG sandbox flag must stay in sync with this.
         APS_ENVIRONMENT: development
+        # The install link the invite sheet hands out. Public, not a
+        # secret, so it lives here rather than in the gitignored
+        # xcconfig: a build that quietly lost it would ship an
+        # "Invite a friend" button with nothing behind it. When the
+        # App Store URL replaces the landing page, this one line moves.
+        INVITE_URL: https://get.howday.app
       configs:
         # Manual signing for Release/archives, scoped to the app target only —
         # passing these on the xcodebuild command line applies them to SPM
@@ -88,6 +94,7 @@ targets:
         SENTRY_DSN: $(SENTRY_DSN)
         UMAMI_URL: $(UMAMI_URL)
         UMAMI_WEBSITE_ID: $(UMAMI_WEBSITE_ID)
+        INVITE_URL: $(INVITE_URL)
         # What a widget tap opens: howday://open?source=… . Nothing else
         # uses the scheme, and the app ignores a URL it can't read.
         CFBundleURLTypes:
