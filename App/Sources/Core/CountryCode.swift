@@ -7,12 +7,27 @@ struct CountryCode: Identifiable, Hashable {
     let region: String
     let dial: Int
 
+    /// The localized country name ("Germany", "Deutschland", …), resolved
+    /// once here rather than on every read. It is asked for far more often
+    /// than it looks: sorting the list compares it twice per comparison,
+    /// `rank` reads it up to twice per country on every keystroke, and each
+    /// visible row reads it again — a few thousand locale lookups and as
+    /// many ICU collations for a list that never changes while the app runs.
+    let name: String
+
+    init(region: String, dial: Int) {
+        self.region = region
+        self.dial = dial
+        self.name = Locale.current.localizedString(forRegionCode: region) ?? region
+    }
+
     var id: String { region }
 
-    /// The localized country name ("Germany", "Deutschland", …).
-    var name: String {
-        Locale.current.localizedString(forRegionCode: region) ?? region
-    }
+    // Identity is the region, as `id` already says. Spelt out so the cached
+    // name cannot take part: two values for the same country are the same
+    // country whatever language they were built in.
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.region == rhs.region }
+    func hash(into hasher: inout Hasher) { hasher.combine(region) }
 
     var dialText: String { "+\(dial)" }
 
