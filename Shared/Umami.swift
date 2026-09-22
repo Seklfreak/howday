@@ -109,6 +109,12 @@ enum Umami {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(config.userAgent, forHTTPHeaderField: "User-Agent")
         request.httpBody = body
+        // A widget's `getTimeline` awaits this before it hands the timeline
+        // back, and the default request timeout is sixty seconds: a census
+        // ping must never be the thing holding a refresh up. The app keeps a
+        // failure for its next attempt; the widget drops it and sends
+        // another on the next rebuild.
+        request.timeoutInterval = 5
         guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
         return ((response as? HTTPURLResponse)?.statusCode ?? 500) < 400
     }
