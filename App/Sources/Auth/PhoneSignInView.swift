@@ -161,6 +161,18 @@ struct PhoneSignInView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(isBusy || e164 == nil)
+
+            // Directly under the button, not in a footer: assent to the
+            // terms is only worth anything if the notice sat next to the
+            // action that gave it. Markdown links open in Safari through
+            // the environment's openURL.
+            Text(LocalizedStringKey(
+                "By continuing you agree to the [Terms of Service](\(AppConfig.termsURL)) "
+                    + "and [Privacy Policy](\(AppConfig.privacyPolicyURL))."
+            ))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
         }
     }
 
