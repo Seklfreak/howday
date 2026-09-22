@@ -183,6 +183,12 @@ and window-geometry guessing; AXe needs neither.
   nothing to the recipient — every recipient is a mutual contact who can
   already select that row through `board_today`. If that trade is ever
   revisited, the fallback is still in the extension and still correct.
+- **The mood is in the payload but never in the banner.** `PushText` keeps
+  the alert generic — "Anna just checked in 💫", where the 💫 is a fixed
+  sparkle — because seeing a friend's mood is what checking in earns, and
+  the board and both widgets gate on `mine != nil`. A banner carrying the
+  emoji would route around that gate entirely. The extension reads the
+  payload's mood for the widget sky and nothing else.
 - The trigger fires on insert **and** on an emoji change to a recent day, so
   edits notify too. Edits are rate limited per author (30 min) via the sealed
   `checkin_push_log` table, claimed atomically in the same
