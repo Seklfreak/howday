@@ -23,6 +23,18 @@ struct HowdayApp: App {
                 // reports auth/RLS/PostgREST problems as 4xx, and those
                 // are exactly the ones worth seeing.
                 options.failedRequestStatusCodes = [HttpStatusCodeRange(min: 400, max: 599)]
+                // Off: the SDK never sees a watchdog kill, it infers one on
+                // the next launch by elimination — no crash recorded, not
+                // backgrounded, no upgrade, no reboot — which is also exactly
+                // what swiping the app out of the app switcher looks like.
+                // Every report so far has been one event per tester per
+                // build, scattered, where a real memory problem repeats for
+                // the same person; and the app runs at around 37 MB, which
+                // is not a size anything gets killed for. If real numbers
+                // are ever wanted they come from MetricKit's
+                // MXAppExitMetric, which counts memory-limit exits the OS
+                // actually performed, rather than from a guess here.
+                options.enableWatchdogTerminationTracking = false
             }
         }
         // Same rule as Sentry: local runs would only muddy the numbers, and
