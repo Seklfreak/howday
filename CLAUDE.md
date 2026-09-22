@@ -572,6 +572,35 @@ and window-geometry guessing; AXe needs neither.
   bumps trigger a real Beta App Review). TestFlight requires strictly
   increasing build numbers within a version.
 
+## Privacy policy & terms (howday-web)
+
+The privacy policy (howday.app/privacy-policy/) and terms of service
+(howday.app/terms/) live in the sibling repo `Seklfreak/howday-web`, not
+here. Both are written from what the app **actually does** — that the
+address book never leaves the device, which hashes are kept and why, what a
+push carries, that sign-in codes are the only SMS — so a change here can
+make them wrong without anything in this repo failing.
+
+- **Any change that alters what the app stores, sends, or shares must update
+  the documents in the same piece of work**, not as a follow-up. Check both
+  pages whenever you touch: what goes to Supabase (new column, table, or
+  retention), contact hashing/matching/`sync-contacts`, what a push payload
+  contains, analytics events (the policy promises no mood, name, number or
+  hash is ever recorded), Sentry/PII settings, any new SDK or third-party
+  service, hosting region, SMS behaviour, the age requirement, or the scope
+  of **Delete account**. Monetisation of any kind rewrites the terms
+  (liability cap, Apple's paid-app wording).
+- Read the relevant section of each document before deciding nothing
+  changed; the policy is specific enough that "probably still accurate" is
+  usually wrong.
+- When editing: bump **Last updated** in both places on the page (the
+  `.stamp` and the footer), keep the two documents consistent with each
+  other, and if the change is material, announce it in the app — the policy
+  promises that. Pushing `main` in howday-web deploys the site.
+- The three `[YOUR …]` placeholders (responsible party, postal address,
+  contact email) are shared by both documents and must be filled on both
+  pages at once; CI there warns while any remain.
+
 ## Public repo
 
 This repo is public with **no license** (all rights reserved) — keep it that
