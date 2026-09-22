@@ -40,6 +40,13 @@ enum AppConfig {
     /// The install link the invite sheet hands out. Optional in the same way
     /// as the Sentry DSN: a build without it hides the invite rather than
     /// sharing a link that goes nowhere.
+    /// The two documents Settings links to. Fixed rather than configured:
+    /// they are the app's own site, the App Store listing points at the same
+    /// pages, and a build with the links blanked would be worse than one
+    /// with them wrong.
+    static let privacyPolicyURL = URL(string: "https://howday.app/privacy-policy/")!
+    static let termsURL = URL(string: "https://howday.app/terms/")!
+
     static var inviteURL: URL? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "INVITE_URL") as? String,
               let url = URL(string: raw), url.host != nil else {

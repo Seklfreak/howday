@@ -600,6 +600,9 @@ make them wrong without anything in this repo failing.
 - The three `[YOUR …]` placeholders (responsible party, postal address,
   contact email) are shared by both documents and must be filled on both
   pages at once; CI there warns while any remain.
+- Settings links to both pages via `AppConfig.privacyPolicyURL` /
+  `termsURL`, and the App Store record points at the same URLs. Moving a
+  page means changing all three.
 
 ## Wording: it is an emoji, never a mood
 

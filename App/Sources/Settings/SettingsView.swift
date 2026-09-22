@@ -51,6 +51,18 @@ struct SettingsView: View {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
 
+                // Plain Links, so they open in Safari: these are documents
+                // people may want to keep, search or share, not a screen of
+                // the app, and the pages are laid out for a browser.
+                Section {
+                    Link(destination: AppConfig.privacyPolicyURL) {
+                        legalRow("Privacy policy", systemImage: "hand.raised")
+                    }
+                    Link(destination: AppConfig.termsURL) {
+                        legalRow("Terms of service", systemImage: "doc.text")
+                    }
+                }
+
                 Section {
                     LabeledContent("Version", value: AppConfig.versionString)
                     if let userId {
@@ -135,6 +147,19 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// A Link row that looks like the rest of the form: label colour, not
+    /// link blue, with the outward arrow saying it leaves the app.
+    private func legalRow(_ title: String, systemImage: String) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .foregroundStyle(.primary)
     }
 
     /// Copies the ID and flips the trailing icon to a checkmark briefly, so the
