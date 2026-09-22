@@ -36,17 +36,50 @@ final class NotificationService: UNNotificationServiceExtension {
         } else {
             Self.log.info("no sender hash in payload; generic body kept")
         }
-        // A friend's check-in is exactly what the widget shows: refresh it
-        // now rather than at the next half-hour tick. What the app last
-        // published predates this push, so it must not be served in place
-        // of the read.
-        SkySnapshotStore.invalidate()
-        WidgetCenter.shared.reloadAllTimelines()
+        // A friend's check-in is exactly what the widget shows, and the
+        // push carries the mood itself, so the sky can be written here and
+        // drawn from the App Group with no round trip at all. That matters
+        // most on the lock screen, which is looked at while the phone is
+        // still locked — precisely the window a fetch spends waking the
+        // radio. Anything the patch cannot answer for (no mood in the
+        // payload, a sender who is not on the stored sky, yesterday's sky)
+        // falls back to marking it behind the truth, which is what every
+        // push did before.
+        switch storedSkyPatch(userInfo) {
+        case .written:
+            WidgetCenter.shared.reloadAllTimelines()
+        case .alreadyShown:
+            // The sky is already right — whoever read it reloaded then.
+            break
+        case .cannotAnswer:
+            SkySnapshotStore.invalidate()
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         // Calling the handler is what lets iOS tear this process down, and
         // the reload is a message to the widget daemon that has to leave
         // first. A fifth of a second is imperceptible on a banner and is
         // the difference between a request sent and one lost with us.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { contentHandler(content) }
+    }
+
+    /// The sender's own mood, written into the stored sky. The timestamp is
+    /// the device's, not the server's: a push lands within a second or two
+    /// of the check-in it announces, and the only thing that reads it is the
+    /// ordering of a handful of friends.
+    private func storedSkyPatch(_ userInfo: [AnyHashable: Any]) -> SkySnapshot.Patch {
+        // Both or neither: a push from before the server sent them, and a
+        // join push, carry no mood and get the old behaviour.
+        guard let emoji = userInfo["emoji"] as? String,
+              let raw = userInfo["sender_id"] as? String,
+              let sender = UUID(uuidString: raw) else { return .cannotAnswer }
+        let patch = SkySnapshotStore.applyCheckin(by: sender, emoji: emoji)
+        // Outcome only — never the mood, the name or the hash.
+        switch patch {
+        case .written: Self.log.info("sky written from payload")
+        case .alreadyShown: Self.log.info("sky already showed it")
+        case .cannotAnswer: Self.log.info("sky could not answer; marked behind")
+        }
+        return patch
     }
 
     /// iOS gives the extension about 30 seconds; a file read never gets

@@ -6,6 +6,10 @@
 // the author's phone hash rides along so the recipient's device can put a
 // name to it from its own address book. Safe to send: every recipient is a
 // mutual contact, so that number is by definition already in their book.
+// The mood and the author's id ride along for the same reason — the
+// recipient can already select both through board_today — and they are what
+// let the extension write the new sky the widgets read instead of sending
+// every one of them to the network. See CLAUDE.md, "Push notifications".
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { type Recipient, sendAlerts } from "../_shared/apns.ts";
 
@@ -31,8 +35,9 @@ Deno.serve(async (req) => {
 
   let userId: unknown;
   let kind: unknown;
+  let emoji: unknown;
   try {
-    ({ user_id: userId, kind } = await req.json());
+    ({ user_id: userId, kind, emoji } = await req.json());
   } catch {
     return json({ error: "invalid JSON body" }, 400);
   }
@@ -59,6 +64,10 @@ Deno.serve(async (req) => {
       threadId: "friend-checkins",
       payload: {
         kind: kind === "update" ? "update" : "new",
+        sender_id: userId,
+        // Absent on a caller that predates the trigger passing it; the
+        // extension then falls back to sending the widgets to the board.
+        ...(typeof emoji === "string" && emoji ? { emoji } : {}),
         ...(author?.phone_hash ? { sender_hash: author.phone_hash } : {}),
       },
     }),

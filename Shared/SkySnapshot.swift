@@ -15,7 +15,7 @@ struct SkySnapshot: Hashable, Sendable, Codable {
     let day: String
     /// Your own emoji today — nil is the gate: friends' moods stay hidden.
     let mine: String?
-    let friends: [SkyFriend]
+    var friends: [SkyFriend]
     /// The day's sixth offer for the lock-screen picker; nil when there is
     /// no user to derive it from.
     var wildcard: String?
@@ -80,6 +80,44 @@ struct SkySnapshot: Hashable, Sendable, Codable {
         return SkySnapshot(state: .ready, day: LocalDay.string(), mine: "🙂", friends: SkySnapshot.sorted(friends), wildcard: "🚀")
     }
 
+    /// What a friend's mood did to this sky.
+    enum Patch: Equatable {
+        /// It changed, and the widgets should be told.
+        case written(SkySnapshot)
+        /// This sky already showed it — the app read the board just before
+        /// the push landed, say. Nothing to draw, and a reload spent on
+        /// nothing is one the next friend's push does not get.
+        case alreadyShown
+        /// This sky cannot answer for that friend: a different day, a read
+        /// that failed, someone who is not on it. The caller falls back to
+        /// saying the sky is behind the truth.
+        case cannotAnswer
+    }
+
+    /// This sky with one friend's mood written into it.
+    ///
+    /// The push carries the mood, so a friend's check-in reaches the widget
+    /// without anyone reading the board: the alternative was to mark the
+    /// stored sky stale and let each widget fetch, and a widget's fetch runs
+    /// on a locked phone with the radio asleep, which is the slow part and
+    /// the part that fails. `fetchedAt` moves to now deliberately — this is
+    /// the freshest the sky has been, and leaving it behind would send the
+    /// widget to the network for the one thing it has just been told.
+    func applying(emoji: String, from friend: UUID, at when: Date = .now) -> Patch {
+        guard state == .ready, day == LocalDay.string(),
+              let index = friends.firstIndex(where: { $0.id == friend }) else { return .cannotAnswer }
+        guard friends[index].emoji != emoji else { return .alreadyShown }
+        var patched = friends
+        patched[index] = SkyFriend(
+            id: friends[index].id, name: friends[index].name, emoji: emoji, checkedInAt: when
+        )
+        var copy = self
+        copy.friends = Self.sorted(patched)
+        copy.fetchedAt = when
+        copy.isStale = false
+        return .written(copy)
+    }
+
     static func sorted(_ friends: [SkyFriend]) -> [SkyFriend] {
         friends.sorted { lhs, rhs in
             switch (lhs.checkedInAt, rhs.checkedInAt) {
@@ -118,6 +156,15 @@ enum SkySnapshotStore {
         guard var snapshot = load() else { return }
         snapshot.isStale = true
         save(snapshot)
+    }
+
+    /// Writes a friend's new mood straight into the stored sky, so a widget
+    /// can draw it without reading the board.
+    static func applyCheckin(by friend: UUID, emoji: String, at when: Date = .now) -> SkySnapshot.Patch {
+        guard let stored = load() else { return .cannotAnswer }
+        let patch = stored.applying(emoji: emoji, from: friend, at: when)
+        if case .written(let updated) = patch { save(updated) }
+        return patch
     }
 
     /// Sign-out takes the sky with it, or the widget keeps drawing a

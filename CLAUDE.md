@@ -171,6 +171,18 @@ and window-geometry guessing; AXe needs neither.
   a custom parameter there without superuser, which Supabase's `postgres`
   role is not.) The `push-checkin` Edge Function has
   `verify_jwt = false` and is gated only by the `x-push-secret` header.
+- **The payload carries the mood** (`emoji`) and the sender's id
+  (`sender_id`) alongside the hash, and that is a deliberate trade, not an
+  oversight: it means moods pass through APNs, where Apple can read them.
+  It buys the one thing that makes a friend's check-in reach a *locked*
+  phone at once — `NotificationService` writes the new sky into the App
+  Group itself (`SkySnapshot.applying(emoji:from:at:)`), so no widget has
+  to go to the network. Marking the sky stale instead sent every widget to
+  the board, and a widget's fetch runs on a locked phone with the radio
+  asleep, which is both the slow part and the part that fails. It leaks
+  nothing to the recipient — every recipient is a mutual contact who can
+  already select that row through `board_today`. If that trade is ever
+  revisited, the fallback is still in the extension and still correct.
 - The trigger fires on insert **and** on an emoji change to a recent day, so
   edits notify too. Edits are rate limited per author (30 min) via the sealed
   `checkin_push_log` table, claimed atomically in the same
@@ -256,8 +268,16 @@ and window-geometry guessing; AXe needs neither.
   on a locked phone where the round trip is the part that fails. **So
   anything that changes the board without reading it back must
   `invalidate()` first** — your own check-in, the queue draining, the
-  lock-screen intent, a friend's push — or the widget serves the sky from
-  before the change. Sign-out must `clear()` it, or the next person to
+  lock-screen intent — or the widget serves the sky from before the change.
+  A friend's push is the exception: it carries the mood, so the extension
+  writes the change rather than announcing one (above). `SkySnapshot.Patch`
+  has three answers, and each is load-bearing: `.written` reloads,
+  `.cannotAnswer` (no mood in the payload, a sender who is not on the
+  stored sky, yesterday's sky) falls back to `invalidate()` plus a reload,
+  and `.alreadyShown` — the app read the board just before the push landed
+  — does **neither**. Folding that last case into the fallback spends a
+  fetch and a reload proving nothing changed, which is a reload the next
+  friend's push then does not get. Sign-out must `clear()` it, or the next person to
   pick the phone up still sees a friend's mood.
 - The push extension calls the handler a fifth of a second after the
   reload: handing back the content is what lets iOS tear the process down,
