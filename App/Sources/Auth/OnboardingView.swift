@@ -35,7 +35,7 @@ struct OnboardingView: View {
         page(
             symbol: "person.2.circle",
             title: "Find your friends",
-            body: "You see each other's moods once you're both in each other's contacts — nothing to add, "
+            body: "You see each other's emoji once you're both in each other's contacts — nothing to add, "
                 + "no usernames. Numbers are hashed on your device before matching; names and photos never "
                 + "leave your phone.",
             action: "Allow contacts access",

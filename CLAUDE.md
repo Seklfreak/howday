@@ -585,7 +585,7 @@ make them wrong without anything in this repo failing.
   the documents in the same piece of work**, not as a follow-up. Check both
   pages whenever you touch: what goes to Supabase (new column, table, or
   retention), contact hashing/matching/`sync-contacts`, what a push payload
-  contains, analytics events (the policy promises no mood, name, number or
+  contains, analytics events (the policy promises no emoji, name, number or
   hash is ever recorded), Sentry/PII settings, any new SDK or third-party
   service, hosting region, SMS behaviour, the age requirement, or the scope
   of **Delete account**. Monetisation of any kind rewrites the terms
@@ -600,6 +600,43 @@ make them wrong without anything in this repo failing.
 - The three `[YOUR …]` placeholders (responsible party, postal address,
   contact email) are shared by both documents and must be filled on both
   pages at once; CI there warns while any remain.
+
+## Wording: it is an emoji, never a mood
+
+**Nothing a user, tester, reviewer or visitor can read may say "mood"** —
+or "feeling", "mental", "wellbeing", "health", or anything else that frames
+Howday as tracking how someone *is*. It is an emoji, a check-in, a day. The
+terms of service say Howday is not a mental-health or crisis service; every
+"mood" in copy argues the other way, and "consumer health data" statutes
+(Washington's MHMDA and its copies) turn on exactly that framing.
+
+Where the rule applies, and where the word has crept in before:
+
+- **UI strings** in `App/`, including notices, onboarding, empty states and
+  `accessibilityLabel`s (VoiceOver reads them out).
+- **Notifications**: `ReminderScheduler` body, `Shared/PushText`, and the
+  server-side fallback text in `supabase/functions/push-checkin` (that one
+  needs `supabase functions deploy` — it is not in CI).
+- **Widgets and intents**: `configurationDisplayName`, `.description(…)`,
+  `IntentDescription`, Siri phrases.
+- **Analytics screen names** in `Analytics.swift` (they show up in Umami).
+- **App Store Connect**: app name and subtitle, App Store description,
+  keywords, promotional text, the TestFlight beta description
+  (`betaAppLocalizations`), beta review notes, and each build's "What to
+  Test" (`betaBuildLocalizations`). The name was "Howday: Moods with
+  Friends" until 2026-09-22.
+- **Generated release notes**: `release.yaml`'s `project-description`
+  carries the rule because the notes become What to Test and are generated
+  from commits that do say "mood". Keep that paragraph when editing it.
+- **Public prose**: `README.md`, `ROADMAP.md`, and everything in
+  `Seklfreak/howday-web` (pages, meta descriptions, Open Graph text).
+
+Exempt: identifiers (`MoodEmoji`, `MoodTheme`, `.moodTheme`, the Sentry
+project, the bundle id), SQL migrations already applied, and existing code
+comments. New code and comments should still say emoji or check-in. Before
+shipping copy, run
+`grep -rn -i mood App Widgets Notifications Shared supabase/functions README.md ROADMAP.md`
+and check that every hit is an identifier or a comment.
 
 ## Public repo
 

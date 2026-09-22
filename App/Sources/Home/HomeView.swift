@@ -18,7 +18,7 @@ struct HomeView: View {
     @State private var isChangingMood = false
     @State private var saveTask: Task<Void, Never>?
     /// A quiet line under the picker or the mood bar — "saving when you're
-    /// back online", "yesterday's mood didn't make it" — as opposed to
+    /// back online", "yesterday's emoji didn't make it" — as opposed to
     /// `errorMessage`, which is red and means something actually refused.
     @State private var notice: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -355,7 +355,7 @@ extension HomeView {
             case .expired:
                 // Not saved as yesterday: saveToday cannot backdate, and a
                 // parked entry must not become the way around that.
-                notice = "Yesterday's mood didn't reach the server before midnight."
+                notice = "Yesterday's emoji didn't reach the server before midnight."
                 Analytics.track("checkin_expired")
             case .rejected(let entry, let message):
                 if selected == entry.emoji { withAnimation { selected = confirmed } }

@@ -11,7 +11,7 @@
 enum PushText {
     static func body(name: String, kind: String?) -> String {
         switch kind {
-        case "update": "\(name)'s mood changed 💫"
+        case "update": "\(name)'s emoji changed 💫"
         case "join": "\(name) joined Howday 👋"
         default: "\(name) just checked in 💫"
         }

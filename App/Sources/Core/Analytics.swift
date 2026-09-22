@@ -31,7 +31,7 @@ enum Analytics {
             case .signIn: "Sign in"
             case .onboarding: "Onboarding"
             case .notifications: "Notifications"
-            case .home: "Mood picker"
+            case .home: "Emoji picker"
             case .board: "Friends board"
             case .history: "History"
             case .invite: "Invite"

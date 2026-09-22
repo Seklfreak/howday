@@ -18,7 +18,7 @@ import { type Recipient, sendAlerts } from "../_shared/apns.ts";
 // body rather than dropping the push.
 const ALERT_BODY = {
   new: "A friend just checked in 💫",
-  update: "A friend changed their mood 💫",
+  update: "A friend changed their emoji 💫",
 } as const;
 
 Deno.serve(async (req) => {

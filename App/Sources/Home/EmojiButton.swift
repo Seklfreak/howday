@@ -40,7 +40,7 @@ struct EmojiButton: View {
                 .shadow(color: isSelected ? theme.accent.opacity(0.55) : .clear, radius: 10)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(emoji) mood")
+        .accessibilityLabel("\(emoji)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

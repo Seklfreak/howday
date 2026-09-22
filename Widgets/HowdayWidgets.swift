@@ -26,7 +26,7 @@ struct FriendsSkyWidget: Widget {
                 }
         }
         .configurationDisplayName("Friends today")
-        .description("Your friends' moods, once you've checked in.")
+        .description("Your friends' emoji, once you've checked in.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }

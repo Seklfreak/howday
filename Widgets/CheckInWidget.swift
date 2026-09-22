@@ -15,7 +15,7 @@ struct CheckInWidget: Widget {
                 .containerBackground(for: .widget) { AccessoryWidgetBackground() }
         }
         .configurationDisplayName("Check in")
-        .description("Your mood today, and your friends' once you've checked in.")
+        .description("Your emoji today, and your friends' once you've checked in.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular])
     }
 }
@@ -62,7 +62,7 @@ private struct CircularRing: View {
                 // no countdown text — the emoji is the widget.
                 Text(mine)
                     .font(.system(size: 30))
-                    .accessibilityLabel("Your mood today: \(mine)")
+                    .accessibilityLabel("Your emoji today: \(mine)")
             } else {
                 Circle()
                     .stroke(.white.opacity(0.45), style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [3, 4.5]))
@@ -114,7 +114,7 @@ private struct RectangularStrip: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(choice) mood")
+                    .accessibilityLabel("\(choice)")
                 }
             }
         }

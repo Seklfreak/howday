@@ -64,13 +64,21 @@ jobs:
             testflight.yaml:^(App|Widgets|Notifications|Shared|Config)/|^project\.yml
           project-description: >-
             Howday is an iOS app (SwiftUI, whole repo) shipped to TestFlight
-            on every version tag: a daily mood check-in shared with friends.
+            on every version tag: one emoji a day, shared with friends.
             Changes under App/, Widgets/, Notifications/, Shared/ and
             supabase/ reach users — Widgets/ and Notifications/ are app
             extensions shipped inside the app, Shared/ is code compiled into
             all of them, and supabase/ holds the backend schema and Edge
             Functions the shipped app talks to. Only scripts/, Tests/, README
             and CI workflows live outside the released artifact.
+
+            Wording rule for the release notes (they become the TestFlight
+            "What to Test" text that testers and App Review read): NEVER use
+            the word "mood", "feeling", "mental", "wellbeing", "health" or any
+            other wording that frames the app as tracking how someone is. It is
+            an emoji, a check-in, a day. Commit messages and identifiers in the
+            diff (MoodEmoji, MoodTheme, "mood" in comments) do use the word —
+            translate, do not quote. Say "emoji" or "check-in" instead.
 
             Bump policy: the app's TestFlight marketing version is the tag's
             major.minor, so a minor bump starts a NEW marketing version, and the first

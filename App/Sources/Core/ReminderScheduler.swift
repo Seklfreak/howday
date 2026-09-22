@@ -79,7 +79,7 @@ enum ReminderScheduler {
     }
 
     /// Drops today's pending reminder — the user has already checked in, so
-    /// "check in with your mood for today" would just be noise. Tomorrow's
+    /// "pick your emoji for today" would just be noise. Tomorrow's
     /// booking is untouched.
     static func cancelToday() {
         let today = LocalDay.string()
@@ -135,7 +135,7 @@ enum ReminderScheduler {
     ) async {
         let content = UNMutableNotificationContent()
         content.title = "How are you?"
-        content.body = "Check in with your mood for today."
+        content.body = "Pick your emoji for today."
         content.sound = .default
 
         let planned = plan(

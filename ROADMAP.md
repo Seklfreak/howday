@@ -137,7 +137,7 @@ is lost unless the user remembers to try again.
   satisfied; `HomeView.load()` drains the queue before reading today's row.
 - A pending entry whose `day` is no longer today is discarded, not saved:
   `saveToday` deliberately cannot backdate, and a silent "yesterday" write
-  would bypass that. Show a one-line note that yesterday's mood did not make
+  would bypass that. Show a one-line note that yesterday's emoji did not make
   it, then clear it.
 - `ReminderScheduler.cancelToday()` stays where it is (after the confirmed
   save) so a reminder still fires if the queue never drains.
@@ -205,7 +205,7 @@ it into a name.
 - **Notification Service Extension.** New target in `project.yml`
   (`app-extension`, point `com.apple.usernotifications.service`, bundle id
   `dev.winktech.moodring.notifications`). It reads the map, rewrites the
-  body to *"Anna just checked in"* / *"Anna changed her mood"* /
+  body to *"Anna just checked in"* / *"Anna's emoji changed"* /
   *"Anna joined Howday"*, and falls back to the current generic text when the
   hash is unmapped. No `CNContactStore` in the extension.
 - **Apple side, no UI.** Enable App Groups on the app's App ID, register the
@@ -219,7 +219,7 @@ it into a name.
 **Decisions.**
 - Whether the **emoji** rides along. The server already has it (the trigger
   fires on `checkins`); sending it means *"Anna 🙂 just checked in"* on the
-  lock screen. This is the one place a mood would be visible without opening
+  lock screen. This is the one place an emoji would be visible without opening
   the app and without the check-in gate. Recommend no for the first version:
   the name alone fixes the muting problem, and the gate is the product.
 - `thread-id` per sender versus one thread. Per sender groups a chatty friend
@@ -238,7 +238,7 @@ place for the tap is the home screen and the lock screen.
   Keychain with a shared access group (`keychain-access-groups` entitlement
   on app and extension, plus the App Group for `UserDefaults`). This is the
   hard part and the reason the item is L.
-- **Home-screen widget (medium).** Today's five moods plus the wildcard as
+- **Home-screen widget (medium).** Today's five emoji plus the wildcard as
   interactive buttons; picking one runs the intent, which saves through the
   same repository and reloads the timeline. Reuse the item 4 queue: an
   intent that fails offline enqueues, and the app drains it.
@@ -248,8 +248,8 @@ place for the tap is the home screen and the lock screen.
 - **Lock-screen widget (accessory).** Your ring in today's color, or the
   neutral ring before you have checked in. Tapping opens the app.
 - **Control Center control (iOS 18).** `ControlWidget` that opens the app on
-  the picker, or runs the intent with the last-used mood.
-- **Siri / Shortcuts.** `AppShortcutsProvider` with *"Log my mood in
+  the picker, or runs the intent with the last-used emoji.
+- **Siri / Shortcuts.** `AppShortcutsProvider` with *"Check in on
   Howday"*; the emoji is a parameter Siri asks for.
 - **Friends' rings on the widget** is a second phase: the board needs names
   and photos, which means the name map from item 6 and a thumbnail cache in
@@ -261,7 +261,7 @@ place for the tap is the home screen and the lock screen.
   widget stay distinguishable without a new event.
 
 **Decisions.**
-- Whether the widget check-in should be allowed to *change* an existing mood
+- Whether the widget check-in should be allowed to *change* an existing emoji
   or only make the first one. Recommend both, matching the app.
 - Timeline refresh budget: WidgetKit allows a few dozen reloads a day.
   Reload on the user's own check-in and on app foreground only; friends'

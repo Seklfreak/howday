@@ -18,6 +18,6 @@ struct CheckInControl: ControlWidget {
             }
         }
         .displayName("Check in")
-        .description("Open Howday to check in with today's mood.")
+        .description("Open Howday to pick today's emoji.")
     }
 }

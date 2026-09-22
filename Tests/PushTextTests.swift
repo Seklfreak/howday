@@ -5,7 +5,7 @@ import Testing
 struct PushTextTests {
     @Test func eachKindNamesTheSender() {
         #expect(PushText.body(name: "Anna", kind: "new") == "Anna just checked in 💫")
-        #expect(PushText.body(name: "Anna", kind: "update") == "Anna's mood changed 💫")
+        #expect(PushText.body(name: "Anna", kind: "update") == "Anna's emoji changed 💫")
         #expect(PushText.body(name: "Anna", kind: "join") == "Anna joined Howday 👋")
     }
 

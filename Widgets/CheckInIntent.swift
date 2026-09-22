@@ -13,9 +13,9 @@ import WidgetKit
 /// check-in made here on its next load and cancels the day's reminder.
 struct CheckInIntent: AppIntent {
     static let title: LocalizedStringResource = "Check in"
-    static let description = IntentDescription("Saves your mood for today.")
+    static let description = IntentDescription("Saves your emoji for today.")
 
-    @Parameter(title: "Mood")
+    @Parameter(title: "Emoji")
     var emoji: String
 
     init() {

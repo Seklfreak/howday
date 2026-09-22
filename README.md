@@ -1,7 +1,7 @@
 # Howday
 
-One mood check-in a day; see how your friends are doing. You can't see your
-friends' moods until you've shared yours. Friends are contacts-based — no
+One emoji a day, shared with friends. You can't see your friends' emoji
+until you've picked yours. Friends are contacts-based — no
 friend requests, no profiles to fill in: you see each other once you're both
 in each other's address books, shown with the name and photo from your own
 contacts. iOS (SwiftUI, iOS 17+) with a Supabase backend and phone-number
@@ -93,7 +93,7 @@ xcodebuild -project Howday.xcodeproj -scheme Howday \
 - **`checkins.day`** is the user's *local* date, computed client-side; the
   `unique (user_id, day)` constraint enforces one check-in per day.
 - **Friend-check-in pushes** notify only *mutual* contacts, and the alert text
-  is generic — the server stores no names to put in it. Changing today's mood
+  is generic — the server stores no names to put in it. Changing today's emoji
   notifies too, but pushes are rate limited to one per author per 30 minutes
   so that re-tapping emoji can't spam anyone; a new day's check-in always
   goes out regardless of the cooldown.
@@ -101,7 +101,7 @@ xcodebuild -project Howday.xcodeproj -scheme Howday \
   views and a short list of actions straight to a self-hosted Umami instance —
   no SDK and no third party in the path. The visitor id is a random UUID per
   install (gone when the app is deleted), never the Supabase user id, and the
-  check-in events deliberately carry no emoji: the mood is the private part.
+  check-in events deliberately carry no emoji: the emoji is the private part.
   No IDFA, so no App Tracking Transparency prompt.
 - **`profiles.phone_hash`** is revoked from client roles at the column level;
   only the service-role Edge Function reads it.
