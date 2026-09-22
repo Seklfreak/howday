@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-/// The daily "how are you?" local notification. Fires at a different random
+/// The daily "today's emoji" local notification. Fires at a different random
 /// minute each day, inside a window the user picks. Everything is on-device —
 /// no APNs, no server involvement.
 ///
@@ -134,7 +134,7 @@ enum ReminderScheduler {
         after lastDone: String, windowStart: Int, windowEnd: Int, in center: UNUserNotificationCenter
     ) async {
         let content = UNMutableNotificationContent()
-        content.title = "How are you?"
+        content.title = "Today's emoji"
         content.body = "Pick your emoji for today."
         content.sound = .default
 

@@ -605,9 +605,14 @@ make them wrong without anything in this repo failing.
 
 **Nothing a user, tester, reviewer or visitor can read may say "mood"** —
 or "feeling", "mental", "wellbeing", "health", or anything else that frames
-Howday as tracking how someone *is*. It is an emoji, a check-in, a day. The
-terms of service say Howday is not a mental-health or crisis service; every
-"mood" in copy argues the other way, and "consumer health data" statutes
+Howday as tracking how someone *is*. That includes the indirect forms:
+**"How are you?", "how your day is going", "how your day went", "the emoji
+your day feels like", "see how your friends are doing"** all say mood
+without the word, and all have been in the copy. The emoji is not *of*
+anything: you pick one, friends see it. Say "today's emoji", "pick one
+emoji", "your friends' emoji", "checked in". The terms of service say
+Howday is not a mental-health or crisis service; every one of those
+phrases argues the other way, and "consumer health data" statutes
 (Washington's MHMDA and its copies) turn on exactly that framing.
 
 Where the rule applies, and where the word has crept in before:
@@ -636,7 +641,9 @@ project, the bundle id), SQL migrations already applied, and existing code
 comments. New code and comments should still say emoji or check-in. Before
 shipping copy, run
 `grep -rn -i mood App Widgets Notifications Shared supabase/functions README.md ROADMAP.md`
-and check that every hit is an identifier or a comment.
+and check that every hit is an identifier or a comment; then
+`grep -rn -i -E "how are you|how your|are doing|feels? like|day went" App Widgets Shared`
+for the indirect forms.
 
 ## Public repo
 

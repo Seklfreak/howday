@@ -96,7 +96,7 @@ private struct RectangularStrip: View {
 
     private var picker: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("How are you today?")
+            Text("Today, in one emoji")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
             HStack(spacing: 4) {
                 ForEach(snapshot.choices, id: \.self) { choice in

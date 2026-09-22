@@ -75,7 +75,9 @@ jobs:
             Wording rule for the release notes (they become the TestFlight
             "What to Test" text that testers and App Review read): NEVER use
             the word "mood", "feeling", "mental", "wellbeing", "health" or any
-            other wording that frames the app as tracking how someone is. It is
+            other wording that frames the app as tracking how someone is —
+            including the indirect forms "how are you", "how your day is
+            going", "how friends are doing", "what your day feels like". It is
             an emoji, a check-in, a day. Commit messages and identifiers in the
             diff (MoodEmoji, MoodTheme, "mood" in comments) do use the word —
             translate, do not quote. Say "emoji" or "check-in" instead.

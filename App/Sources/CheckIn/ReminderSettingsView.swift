@@ -42,7 +42,7 @@ struct ReminderSettingsView: View {
                     }
                 } footer: {
                     Text(
-                        "One notification a day asking how you are, at a different time each day "
+                        "One notification a day asking for your emoji, at a different time each day "
                             + "somewhere between these two. Scheduled on this device only."
                     )
                 }

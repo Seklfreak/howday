@@ -18,7 +18,7 @@ enum Invite {
     /// It makes no claim about the app, deliberately. It is a question one
     /// friend asks another, and the link is how it gets answered — which is
     /// also, exactly, what the app is for.
-    static let message = "How's your day, in one emoji? Tell me on here:"
+    static let message = "What's your emoji today? Show me on here:"
 
     /// The sentence with the link on the end of it — the whole invite as one
     /// piece of text.

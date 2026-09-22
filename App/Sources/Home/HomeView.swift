@@ -100,7 +100,7 @@ struct HomeView: View {
         VStack(spacing: 40) {
             Spacer()
 
-            Text("How are you today?")
+            Text("Today, in one emoji")
                 .font(.title.weight(.semibold))
 
             // Two columns at the accessibility sizes: the circles grow with
