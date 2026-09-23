@@ -182,13 +182,11 @@ private struct LargeSky: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center) {
-                // "Updated 12:03" is diagnostic: it says when the widget last
-                // read the board, which is the only way to tell a stale sky
-                // from a quiet day.
-                Text(
-                    "\(Date.now.formatted(.dateTime.weekday(.wide))) · \(snapshot.friendsIn) of \(snapshot.friends.count) friends in"
-                        + " · updated \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))"
-                )
+                // Just the day. This line used to carry a friend count and
+                // an "updated 12:03" stamp as well; the stamp was a
+                // diagnostic that shipped, and the count answered nothing
+                // the sky itself does not.
+                Text(Date.now.formatted(.dateTime.weekday(.wide)))
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .textCase(.uppercase)
                     .tracking(0.6)
