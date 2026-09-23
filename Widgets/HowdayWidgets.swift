@@ -149,7 +149,7 @@ private struct ScatteredSky: View {
         GeometryReader { proxy in
             let layout = SkyLayout.scattered(
                 snapshot.friends, in: proxy.size, day: snapshot.day, phase: phase,
-                inset: 10, topInset: showsNames ? 2 : 0, bottomInset: locked ? 42 : (showsNames ? 12 : 0),
+                inset: 10, topInset: showsNames ? 2 : 0, bottomInset: locked ? 32 : (showsNames ? 12 : 0),
                 labelAllowance: showsNames && !locked ? 12 : 0
             )
             ZStack {
@@ -160,7 +160,7 @@ private struct ScatteredSky: View {
                 if locked {
                     VStack {
                         Spacer()
-                        LockedCaption(friendsIn: snapshot.friendsIn)
+                        LockedCaption()
                             .padding(.bottom, 10)
                     }
                     .frame(maxWidth: .infinity)
@@ -224,7 +224,7 @@ private struct LargeSky: View {
                             .position(placement.center)
                     }
                     if locked {
-                        LockedCaption(friendsIn: snapshot.friendsIn)
+                        LockedCaption()
                     }
                 }
                 .animation(.easeInOut(duration: 1.5), value: phase)
@@ -243,34 +243,17 @@ private struct LargeSky: View {
     }
 }
 
-/// What the locked sky says in place of the emoji. Two short lines in text
-/// styles, no pill: the widget is read from arm's length, and the one-line
-/// 9pt capsule this replaces was the least legible thing on the home
-/// screen. The prompt is the line that matters, so it comes first and
-/// brighter; the count sits under it and is worded for zero and for one.
+/// What the locked sky says in place of the emoji: the prompt and nothing
+/// else. A friend count used to sit under it, and before that the whole
+/// thing was one 9pt line in a capsule; the question marks already say
+/// there is something to see, so the count was answering nothing. Footnote
+/// size, no box, a soft shadow so it reads over a bright bloom.
 private struct LockedCaption: View {
-    let friendsIn: Int
-
-    private var count: String {
-        switch friendsIn {
-        case 0: "Nobody's in yet"
-        case 1: "1 friend is in"
-        default: "\(friendsIn) friends are in"
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 1) {
-            Text("Check in to see")
-                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.92))
-            Text(count)
-                .font(.system(.caption2, design: .rounded, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .multilineTextAlignment(.center)
-        // Legible over a bright bloom without a box behind it.
-        .shadow(color: .black.opacity(0.4), radius: 6)
+        Text("Check in to see")
+            .font(.system(.footnote, design: .rounded, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.92))
+            .shadow(color: .black.opacity(0.4), radius: 6)
     }
 }
 
