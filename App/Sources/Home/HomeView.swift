@@ -21,6 +21,10 @@ struct HomeView: View {
     /// back online", "yesterday's emoji didn't make it" — as opposed to
     /// `errorMessage`, which is red and means something actually refused.
     @State private var notice: String?
+    /// The local day the screen last loaded for. Everything above is about
+    /// that day, and the screen stays mounted across midnight in the
+    /// background — so it is compared on every foreground.
+    @State private var loadedDay: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
 
@@ -70,8 +74,25 @@ struct HomeView: View {
                     await flushPending()
                 }
             }
+            .task {
+                // Midnight with the app open in the foreground. Backgrounded
+                // apps are not promised this notification, which is why the
+                // foreground handler below checks the day itself.
+                for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
+                    await startNewDay()
+                }
+            }
             .onChange(of: scenePhase) {
                 guard scenePhase == .active, !isLoading else { return }
+                if let loadedDay, loadedDay != LocalDay.string() {
+                    // Midnight passed while the app sat in the background.
+                    // The view is still mounted with yesterday on it, and
+                    // adoptServerCheckin would find no row for today and
+                    // leave it there — which showed yesterday's emoji as
+                    // today's, board and all.
+                    Task { await startNewDay() }
+                    return
+                }
                 if CheckinQueue.pending != nil {
                     Task { await flushPending() }
                 } else {
@@ -201,6 +222,7 @@ struct HomeView: View {
     }
 
     private func load() async {
+        loadedDay = LocalDay.string()
         // The stored session, not `auth.session`: the latter refreshes an
         // expired token first and throws without a network, and the
         // wildcard needs no server — offline used to lose the sixth emoji.
@@ -308,6 +330,22 @@ struct HomeView: View {
 /// network. An extension rather than more of the view — this is about the
 /// queue, not about what is on screen.
 extension HomeView {
+    /// The day changed under a mounted screen: forget yesterday and load
+    /// today from scratch, the way a cold launch would. Waits for a save
+    /// still in flight first — it targets the day it was tapped on, and
+    /// its outcome must not land on the new day's selection.
+    private func startNewDay() async {
+        guard loadedDay != LocalDay.string() else { return }
+        await saveTask?.value
+        isLoading = true
+        selected = nil
+        confirmed = nil
+        notice = nil
+        errorMessage = nil
+        isChangingMood = false
+        await load()
+    }
+
     /// Picks up a check-in the server has that this screen doesn't — made
     /// from the lock-screen widget while the app was backgrounded. Runs on
     /// the save chain so it can't race a tap made just now, and only ever
