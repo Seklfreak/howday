@@ -44,11 +44,13 @@ and window-geometry guessing; AXe needs neither.
   (`No keycode found for character`). Instead: `printf '🥳' | xcrun simctl
   pbcopy <UDID>`, long-press the field (`axe touch -x -y --down`, sleep ~1s,
   `--up`), then `describe-ui` to find and tap the `Paste` callout button.
-- **The iOS 26 simulator runtime does not render color emoji** — every emoji
-  shows as a missing-glyph "?" box, at any size, in the app AND in the sim's
-  Safari (that's how to prove it's not an app bug). Judge emoji rendering on a
-  real device; in the sim, verify emoji correctness via the accessibility
-  tree's AXLabels instead of screenshots.
+- **Use an iOS 26.5 (or newer) simulator runtime, not 26.3.** Under Xcode 27
+  on macOS 27 the 26.3 runtime draws every emoji as a missing-glyph "?" box,
+  in the app and in the sim's own Safari alike, even though the emoji font is
+  in the runtime. A fresh 26.3 device is flaky beyond that (`simctl openurl`
+  times out, home-screen widgets stay blank). A 26.5 device renders colour
+  emoji normally. If "?" boxes show up, check the device's runtime
+  (`xcrun simctl list devices`) before suspecting the app.
 - Sign-in uses the Supabase test phone numbers with the fixed OTP (deliberately
   not in this repo — see README/rls-proof env). They're readable via the
   Management API: `curl -H "Authorization: Bearer $TOKEN"
@@ -312,8 +314,7 @@ and window-geometry guessing; AXe needs neither.
   sheet. Both accessory families render there and run the real timeline.
 - The simulator can add the widget (long-press home → Edit → Add Widget →
   search Howday, driven with AXe) and runs the real timeline with the
-  app's session — emoji render as "?" boxes there, like everywhere in the
-  iOS 26 simulator. Gallery previews show `SkySnapshot.placeholder`.
+  app's session. Gallery previews show `SkySnapshot.placeholder`.
 
 ## Analytics (Umami)
 
