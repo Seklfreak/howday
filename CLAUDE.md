@@ -44,12 +44,17 @@ and window-geometry guessing; AXe needs neither.
   (`No keycode found for character`). Instead: `printf '🥳' | xcrun simctl
   pbcopy <UDID>`, long-press the field (`axe touch -x -y --down`, sleep ~1s,
   `--up`), then `describe-ui` to find and tap the `Paste` callout button.
-- **Installing the Xcode 27.1 beta breaks AXe taps on every simulator.**
+- **Don't install the Xcode 27.1 beta (the iPhone Duo one) alongside 27.0.**
   It upgrades the machine-wide CoreSimulator service (1171 → 1174), and AXe
-  1.8.0's taps then report success and do nothing — on any runtime, from
-  either Xcode. `axe type` still works; on the iPhone Duo even `describe-ui`
-  times out. Until AXe catches up, taps are manual (the Duo's poses only
-  ever were: Device Hub's buttons, no `simctl` equivalent).
+  1.8.0's taps then report success and do nothing — on every simulator and
+  runtime, from either Xcode. `axe type` still works; on the Duo even
+  `describe-ui` times out, and its poses are Device Hub buttons with no
+  `simctl` equivalent anyway. Stay on 27.0's service until AXe catches up.
+  Deleting the beta does not undo it, and neither does re-running 27.0's
+  `XcodeSystemResources.pkg`: the installer won't replace a framework with
+  an older version. Remove `/Library/Developer/PrivateFrameworks/CoreSimulator.framework`
+  first, reinstall that package from `Xcode.app/Contents/Resources/Packages/`,
+  then `killall -9 com.apple.CoreSimulator.CoreSimulatorService`.
 - **Use an iOS 26.5 (or newer) simulator runtime, not 26.3.** Under Xcode 27
   on macOS 27 the 26.3 runtime draws every emoji as a missing-glyph "?" box,
   in the app and in the sim's own Safari alike, even though the emoji font is
