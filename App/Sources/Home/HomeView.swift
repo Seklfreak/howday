@@ -118,9 +118,23 @@ struct HomeView: View {
     }
 
     private var picker: some View {
-        VStack(spacing: 40) {
-            Spacer()
+        // Centred on the screen while the grid fits; at the accessibility
+        // sizes two columns of nine grown circles are taller than any
+        // phone, and the same content scrolls instead of running off it.
+        ViewThatFits(in: .vertical) {
+            VStack(spacing: 40) {
+                Spacer()
+                pickerContent
+                Spacer()
+            }
+            ScrollView {
+                pickerContent.padding(.vertical, 24)
+            }
+        }
+    }
 
+    private var pickerContent: some View {
+        VStack(spacing: 40) {
             Text("Today, in one emoji")
                 .font(.title.weight(.semibold))
 
@@ -145,13 +159,11 @@ struct HomeView: View {
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
-
-            Spacer()
         }
     }
 
     /// Checked in: just your mood, with the friends board underneath.
-    /// Tapping the emoji spreads the bar back into the six choices; picking
+    /// Tapping the emoji spreads the bar back into all the choices; picking
     /// one (or retapping your current mood) collapses it again.
     private var board: some View {
         // Handed to BoardView as its scroll-view header rather than stacked
@@ -161,16 +173,13 @@ struct HomeView: View {
             VStack(spacing: 6) {
                 Group {
                     if isChangingMood {
-                        // A row while six circles fit; at large text sizes
-                        // they don't, and the bar wraps into two rows of
-                        // three rather than running off the screen.
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 10) { moodBarChoices }
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                                moodBarChoices
-                            }
-                            .padding(.horizontal, 24)
+                        // Two rows: nine circles in one would need a screen
+                        // no iPhone has. Rows of three at the accessibility
+                        // sizes, where the circles grow and five don't fit.
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: moodBarColumns), spacing: 10) {
+                            moodBarChoices
                         }
+                        .padding(.horizontal, 24)
                     } else if let selected {
                         EmojiButton(emoji: selected, isSelected: true, diameter: 48, fontSize: 30) {
                             withAnimation { isChangingMood = true }
@@ -192,7 +201,7 @@ struct HomeView: View {
         }
     }
 
-    /// The spread-open mood bar's six buttons, shared by both of its layouts.
+    /// The spread-open bar's buttons.
     private var moodBarChoices: some View {
         ForEach(choices, id: \.self) { choice in
             EmojiButton(
@@ -205,10 +214,14 @@ struct HomeView: View {
         }
     }
 
-    /// The six offered emoji: the fixed suggestions plus the user's daily
-    /// wildcard, laid out by the grid as two rows of three.
+    /// The offered emoji: the fixed suggestions plus the user's daily
+    /// wildcard, laid out by the grid as three rows of three.
     private var choices: [String] {
         MoodEmoji.suggestions + (wildcard.map { [$0] } ?? [])
+    }
+
+    private var moodBarColumns: Int {
+        dynamicTypeSize.isAccessibilitySize ? 3 : 5
     }
 
     private var pickerColumns: Int {
@@ -225,7 +238,7 @@ struct HomeView: View {
         loadedDay = LocalDay.string()
         // The stored session, not `auth.session`: the latter refreshes an
         // expired token first and throws without a network, and the
-        // wildcard needs no server — offline used to lose the sixth emoji.
+        // wildcard needs no server — offline used to lose the last emoji.
         if let userId = Supa.client.auth.currentSession?.user.id {
             wildcard = MoodEmoji.wildcard(for: userId, day: LocalDay.string())
         }

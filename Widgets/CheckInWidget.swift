@@ -3,7 +3,7 @@ import WidgetKit
 
 /// The lock screen, built around your own check-in. Circular: the unworn
 /// ring with a "?" until you check in, then your emoji inside an arc of
-/// the day that is left to change it. Rectangular: the six moods as
+/// the day that is left to change it. Rectangular: six of the emoji as
 /// buttons until you check in — a tap saves without unlocking — then your
 /// friends, latest first. Monochrome by iOS rule; the emoji is the colour.
 struct CheckInWidget: Widget {
@@ -99,7 +99,7 @@ private struct RectangularStrip: View {
             Text("Today, in one emoji")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
             HStack(spacing: 4) {
-                ForEach(snapshot.choices, id: \.self) { choice in
+                ForEach(snapshot.lockScreenChoices, id: \.self) { choice in
                     Button(intent: CheckInIntent(emoji: choice)) {
                         // 14pt in a 24pt circle: a square emoji's diagonal
                         // (about 1.4× its size) stays inside the ring.

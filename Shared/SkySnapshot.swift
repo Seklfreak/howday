@@ -16,7 +16,7 @@ struct SkySnapshot: Hashable, Sendable, Codable {
     /// Your own emoji today — nil is the gate: friends' moods stay hidden.
     let mine: String?
     var friends: [SkyFriend]
-    /// The day's sixth offer for the lock-screen picker; nil when there is
+    /// The day's wildcard for the lock-screen picker; nil when there is
     /// no user to derive it from.
     var wildcard: String?
     /// When the board was read. Shown on the large widget so a stale sky
@@ -51,9 +51,17 @@ struct SkySnapshot: Hashable, Sendable, Codable {
             && friends == other.friends && wildcard == other.wildcard
     }
 
-    /// What the lock-screen picker offers: the five suggestions and the
+    /// What the lock-screen picker offers: the suggestions and the
     /// wildcard, as the app's own picker does.
     var choices: [String] { MoodEmoji.suggestions + (wildcard.map { [$0] } ?? []) }
+
+    /// The lock-screen strip fits six in a row, not all of `choices`: six
+    /// of them in a shuffled order, drawn for the day so a timeline refresh doesn't reshuffle
+    /// the row under someone's thumb. The wildcard is the per-user half of
+    /// the seed, so friends don't all get the same six.
+    var lockScreenChoices: [String] {
+        MoodEmoji.pick(6, from: choices, seed: "\(day)|\(wildcard ?? "")")
+    }
 
     static let signedOut = SkySnapshot(state: .signedOut, day: LocalDay.string(), mine: nil, friends: [])
     static let failed = SkySnapshot(state: .failed, day: LocalDay.string(), mine: nil, friends: [])

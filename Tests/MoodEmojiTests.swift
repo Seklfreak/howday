@@ -46,4 +46,30 @@ struct MoodEmojiTests {
         #expect(mine.count > 10)
         #expect(mine != theirs)
     }
+
+    @Test func pickIsStableSubset() {
+        let choices = MoodEmoji.suggestions + ["🚀"]
+        let picked = MoodEmoji.pick(6, from: choices, seed: "2026-09-25|🚀")
+        #expect(picked.count == 6)
+        #expect(Set(picked).isSubset(of: choices))
+        #expect(picked == MoodEmoji.pick(6, from: choices, seed: "2026-09-25|🚀"))
+    }
+
+    @Test func pickVariesAcrossDays() {
+        let choices = MoodEmoji.suggestions + ["🚀"]
+        let days = (1...30).map { String(format: "2026-09-%02d|🚀", $0) }
+        #expect(Set(days.map { MoodEmoji.pick(6, from: choices, seed: $0) }).count > 5)
+    }
+
+    @Test func pickShufflesTheOrder() {
+        let choices = MoodEmoji.suggestions + ["🚀"]
+        let days = (1...30).map { String(format: "2026-09-%02d|🚀", $0) }
+        let picks = days.map { MoodEmoji.pick(6, from: choices, seed: $0) }
+        #expect(picks.contains { $0 != choices.filter($0.contains) })
+    }
+
+    @Test func pickKeepsShortListsWhole() {
+        let picked = MoodEmoji.pick(6, from: ["😢", "😄"], seed: "x")
+        #expect(Set(picked) == ["😢", "😄"])
+    }
 }

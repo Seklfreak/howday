@@ -2,7 +2,7 @@ import CryptoKit
 import SwiftUI
 
 /// The mood-ring color language: every emoji resolves to three colors. The
-/// five suggestions run cold → warm — a cold blue for sad, the sun for joyful,
+/// first five suggestions run cold → warm — a cold blue for sad, the sun for joyful,
 /// an even teal at the midpoint — because that is the ring people *read*: the
 /// real thermochromic chart (black → amber → green → blue → violet) put both
 /// ends on purples and green on "meh", and nobody saw a mood in it. Accents sit
@@ -32,6 +32,11 @@ struct MoodTheme: Equatable {
         "😐": MoodTheme(0x3FD3C2, 0x0B2826, 0x1A8A7E), // even teal — neither warm nor cold
         "🙂": MoodTheme(0x6CE08A, 0x0F2A18, 0x2E9B52), // fresh green — a good day
         "😄": MoodTheme(0xFFC94A, 0x2F2208, 0xD8911A), // sunlight gold — the emoji's own color
+        // Off the scale, so picked by hand from the hues it leaves free:
+        // hashed, these three landed on the green, the gold and the blue.
+        "🫠": MoodTheme(0xFF8A5B, 0x33160A, 0xD1582A), // hot coral — melting in the heat
+        "🥱": MoodTheme(0xE88BE0, 0x2E1230, 0xB04CA8), // night orchid — past bedtime
+        "😷": MoodTheme(0xC8E65A, 0x252C0A, 0x8AA324), // sickly lime — under the weather
     ]
 
     static func forEmoji(_ emoji: String?) -> MoodTheme {
