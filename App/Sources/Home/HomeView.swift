@@ -173,11 +173,15 @@ struct HomeView: View {
             VStack(spacing: 6) {
                 Group {
                     if isChangingMood {
-                        // Two rows: nine circles in one would need a screen
-                        // no iPhone has. Rows of three at the accessibility
-                        // sizes, where the circles grow and five don't fit.
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: moodBarColumns), spacing: 10) {
-                            moodBarChoices
+                        // Centred rows at a fixed spacing rather than a grid:
+                        // a grid pins a short last row to the left and spreads
+                        // the circles to the screen edges.
+                        VStack(spacing: 10) {
+                            ForEach(moodBarRows, id: \.self) { row in
+                                HStack(spacing: 12) {
+                                    ForEach(row, id: \.self) { moodBarButton($0) }
+                                }
+                            }
                         }
                         .padding(.horizontal, 24)
                     } else if let selected {
@@ -201,16 +205,26 @@ struct HomeView: View {
         }
     }
 
-    /// The spread-open bar's buttons.
-    private var moodBarChoices: some View {
-        ForEach(choices, id: \.self) { choice in
-            EmojiButton(
-                emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
-                diameter: 48, fontSize: 30
-            ) {
-                lockIn(choice)
-                withAnimation { isChangingMood = false }
-            }
+    /// The spread-open bar's rows, as even as they can be: nine circles in
+    /// one row would need a screen no iPhone has, so five over four — and
+    /// three by three at the accessibility sizes, where the circles grow
+    /// and five don't fit.
+    private var moodBarRows: [[String]] {
+        let perRowLimit = dynamicTypeSize.isAccessibilitySize ? 3 : 5
+        let rowCount = (choices.count + perRowLimit - 1) / perRowLimit
+        let perRow = (choices.count + rowCount - 1) / max(rowCount, 1)
+        return stride(from: 0, to: choices.count, by: max(perRow, 1)).map {
+            Array(choices[$0..<min($0 + perRow, choices.count)])
+        }
+    }
+
+    private func moodBarButton(_ choice: String) -> some View {
+        EmojiButton(
+            emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
+            diameter: 48, fontSize: 30
+        ) {
+            lockIn(choice)
+            withAnimation { isChangingMood = false }
         }
     }
 
@@ -218,10 +232,6 @@ struct HomeView: View {
     /// wildcard, laid out by the grid as three rows of three.
     private var choices: [String] {
         MoodEmoji.suggestions + (wildcard.map { [$0] } ?? [])
-    }
-
-    private var moodBarColumns: Int {
-        dynamicTypeSize.isAccessibilitySize ? 3 : 5
     }
 
     private var pickerColumns: Int {
