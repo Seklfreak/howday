@@ -44,6 +44,12 @@ and window-geometry guessing; AXe needs neither.
   (`No keycode found for character`). Instead: `printf '🥳' | xcrun simctl
   pbcopy <UDID>`, long-press the field (`axe touch -x -y --down`, sleep ~1s,
   `--up`), then `describe-ui` to find and tap the `Paste` callout button.
+- **Installing the Xcode 27.1 beta breaks AXe taps on every simulator.**
+  It upgrades the machine-wide CoreSimulator service (1171 → 1174), and AXe
+  1.8.0's taps then report success and do nothing — on any runtime, from
+  either Xcode. `axe type` still works; on the iPhone Duo even `describe-ui`
+  times out. Until AXe catches up, taps are manual (the Duo's poses only
+  ever were: Device Hub's buttons, no `simctl` equivalent).
 - **Use an iOS 26.5 (or newer) simulator runtime, not 26.3.** Under Xcode 27
   on macOS 27 the 26.3 runtime draws every emoji as a missing-glyph "?" box,
   in the app and in the sim's own Safari alike, even though the emoji font is

@@ -72,7 +72,7 @@ struct PhoneSignInView: View {
                     }
                 }
                 .padding(24)
-                .frame(maxWidth: .infinity)
+                .readableWidth()
             }
             .scrollBounceBehavior(.basedOnSize)
         }

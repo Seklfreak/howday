@@ -85,6 +85,7 @@ struct OnboardingView: View {
                 .disabled(isBusy)
         }
         .padding(24)
+        .readableWidth()
     }
 
     private var windowText: String {

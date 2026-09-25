@@ -160,6 +160,7 @@ struct HomeView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
         }
+        .readableWidth()
     }
 
     /// Checked in: just your mood, with the friends board underneath.
