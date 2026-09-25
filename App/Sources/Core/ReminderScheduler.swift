@@ -83,7 +83,16 @@ enum ReminderScheduler {
     /// booking is untouched.
     static func cancelToday() {
         let today = LocalDay.string()
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [requestPrefix + today])
+        let id = requestPrefix + today
+        // Off the caller's thread: despite having no completion handler,
+        // removePendingNotificationRequests waits synchronously on an XPC
+        // reply from the notification daemon. Callers are on the main actor
+        // (HomeView.load, right after a save), so a daemon that is slow to
+        // answer froze the launch on the spinner — which the iOS 27.0
+        // simulator's never does.
+        Task.detached(priority: .utility) {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
+        }
         UserDefaults.standard.set(today, forKey: checkedInDayKey)
     }
 
