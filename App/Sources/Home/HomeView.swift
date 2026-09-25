@@ -48,12 +48,15 @@ struct HomeView: View {
                 NavigationLink {
                     HistoryView()
                 } label: {
-                    Image(systemName: "calendar")
+                    // A Label, not a bare Image: the toolbar still shows only
+                    // the icon, but VoiceOver reads the title instead of the
+                    // symbol's name ("gearshape", "Gear Shape" on iOS 27).
+                    Label("History", systemImage: "calendar")
                 }
                 Button {
                     showSettings = true
                 } label: {
-                    Image(systemName: "gearshape")
+                    Label("Settings", systemImage: "gearshape")
                 }
             }
             .sheet(isPresented: $showSettings) {
