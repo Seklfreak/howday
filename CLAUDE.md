@@ -30,6 +30,26 @@ via the simulator's HID interface. Do NOT use `cliclick`/`screencapture`
 window automation: it needs macOS Accessibility + Screen Recording permissions
 and window-geometry guessing; AXe needs neither.
 
+- **Every UI change is checked on two phones: the iPhone SE (3rd
+  generation) and the iPhone 18 Pro Max** — the smallest screen the app
+  supports (375×667, home button, no Dynamic Island) and the largest
+  (440×956, on the current iOS). Screenshot the changed screens on both;
+  on the SE also at the largest accessibility text size (`xcrun simctl ui
+  <UDID> content_size accessibility-extra-extra-extra-large`, back with
+  `large`), which is where layouts actually break. The SE is where the
+  picker falls back to scrolling and the invite sheet nearly fills the
+  screen; the Pro Max is where anything stretched to the width shows.
+- **The first-check-in picker only shows before today's check-in**, and
+  both test accounts are usually checked in. Launch with a time zone where
+  it is already tomorrow — `SIMCTL_CHILD_TZ=Pacific/Kiritimati xcrun simctl
+  launch <UDID> <bundle id>` — and the app's `LocalDay` finds no row. Look,
+  don't tap: a tap there saves a check-in for tomorrow.
+- **A label match can hit something you can't see.** The accessibility
+  tree includes views behind a sheet and rows scrolled out of view; tapping
+  the first element with a given label once hit the board's "Invite a
+  friend" tile *through* the Settings sheet — the spot that is Sign out.
+  Check the frame is on screen and not under a sheet before tapping.
+
 - Loop: `axe describe-ui --udid <UDID>` → find the element's frame (device
   points) → `axe tap -x -y` / `axe type` / `axe swipe`. Screenshots stay
   `xcrun simctl io <UDID> screenshot out.png`.

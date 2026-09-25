@@ -143,15 +143,22 @@ struct HomeView: View {
 
             // Two columns at the accessibility sizes: the circles grow with
             // the text (see TypeScale), and three of them no longer fit.
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: pickerColumns), spacing: 24) {
-                ForEach(choices, id: \.self) { choice in
-                    EmojiButton(
-                        emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
-                        diameter: 100, fontSize: 64
-                    ) {
-                        lockIn(choice)
+            // Rows rather than a grid, so an odd one out — the wildcard, in
+            // two columns of nine — sits centred instead of under the left
+            // column.
+            VStack(spacing: 24) {
+                ForEach(rows(of: pickerColumns), id: \.self) { row in
+                    HStack(spacing: 16) {
+                        ForEach(row, id: \.self) { choice in
+                            EmojiButton(
+                                emoji: choice, isSelected: selected == choice, isWildcard: choice == wildcard,
+                                diameter: 100, fontSize: 64
+                            ) {
+                                lockIn(choice)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 24)
@@ -216,8 +223,13 @@ struct HomeView: View {
     private var moodBarRows: [[String]] {
         let perRowLimit = dynamicTypeSize.isAccessibilitySize ? 3 : 5
         let rowCount = (choices.count + perRowLimit - 1) / perRowLimit
-        let perRow = (choices.count + rowCount - 1) / max(rowCount, 1)
-        return stride(from: 0, to: choices.count, by: max(perRow, 1)).map {
+        return rows(of: (choices.count + rowCount - 1) / max(rowCount, 1))
+    }
+
+    /// The choices in order, `perRow` at a time; the last row takes what
+    /// is left.
+    private func rows(of perRow: Int) -> [[String]] {
+        stride(from: 0, to: choices.count, by: max(perRow, 1)).map {
             Array(choices[$0..<min($0 + perRow, choices.count)])
         }
     }
