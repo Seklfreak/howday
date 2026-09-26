@@ -10,7 +10,14 @@ packages:
     from: 2.55.1
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
-    from: 9.26.1
+    # Exact, not `from:`: Package.resolved isn't committed, so a floor let
+    # every CI build take whatever release was newest. That is how 9.29.1
+    # reached 1.28 unannounced — it throws an unrecognized selector
+    # (isMetricKitEvent) on every captured event, so the first failed
+    # request crashed the app (getsentry/sentry-cocoa#9154). Renovate's
+    # xcodegen manager reads exactVersion, so new releases now arrive as a
+    # PR and a commit instead.
+    exactVersion: 9.29.2
 configFiles:
   Debug: Config/Secrets.xcconfig
   Release: Config/Secrets.xcconfig
