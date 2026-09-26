@@ -574,6 +574,11 @@ and window-geometry guessing; AXe needs neither.
   minus the random draw and the notification center), and
   `CheckinQueue.drain` (with an injected save). Keep new logic in that
   shape — a pure function beside the side effect — so it lands here too.
+- `CrashReportingTests` starts the real Sentry SDK with the app's own
+  options (`CrashReporting.configure`) and takes one event through it.
+  Debug never starts the SDK otherwise, so this is the only thing before
+  TestFlight that would notice an SDK release crashing on every event —
+  as sentry-cocoa 9.29.1 did to every 1.28 build.
 - `#expect(cond, message)` takes a `Comment`, which is a string *literal*
   type: pass `"\(value)"`, not `value`, or it fails to compile.
 - `CheckinQueueTests` is `.serialized` and points `CheckinQueue.defaults`
