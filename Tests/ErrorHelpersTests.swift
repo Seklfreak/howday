@@ -48,4 +48,18 @@ struct ErrorHelpersTests {
         #expect(!URLError(.badServerResponse).isUserCorrectableSignIn)
         #expect(!CancellationError().isUserCorrectableSignIn)
     }
+
+    /// MOODRING-IOS-7: a board left up over an empty keychain. RootView
+    /// only learns of it through this notification.
+    @Test func aMissingSessionTellsTheRootView() async {
+        var heard = 0
+        let token = NotificationCenter.default.addObserver(forName: .sessionMissing, object: nil, queue: nil) { _ in
+            heard += 1
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        _ = AuthError.sessionMissing.report("test")
+        _ = URLError(.badServerResponse).report("test")
+        _ = authError(.otpExpired).report("test")
+        #expect(heard == 1)
+    }
 }

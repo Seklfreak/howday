@@ -92,7 +92,11 @@ struct RootView: View {
             // time per day; every foreground extends the plan. Never prompts.
             if scenePhase == .active {
                 Task { await ReminderScheduler.topUp() }
+                leaveIfSessionGone()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionMissing).receive(on: RunLoop.main)) { _ in
+            leaveIfSessionGone()
         }
         .task {
             for await state in Supa.client.auth.authStateChanges {
@@ -107,5 +111,18 @@ struct RootView: View {
                 }
             }
         }
+    }
+
+    /// The keychain can lose the session without a `signedOut` reaching
+    /// this process — the SDK in an extension used to delete it (see
+    /// `SessionKeychain`), and anything else that does would be just as
+    /// silent. Without this the board stayed up with "Auth session
+    /// missing." under it and no way back to sign-in short of deleting the
+    /// app. Checked again here rather than trusted from the error: only an
+    /// empty keychain right now means signed out.
+    private func leaveIfSessionGone() {
+        guard stage == .ready || stage == .onboarding,
+              Supa.client.auth.currentSession == nil else { return }
+        stage = .signedOut
     }
 }

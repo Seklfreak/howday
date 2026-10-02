@@ -47,6 +47,9 @@ extension Error {
     /// keeps are separate calls.
     @discardableResult
     func report(_ flow: String) -> String {
+        if case .sessionMissing? = self as? AuthError {
+            NotificationCenter.default.post(name: .sessionMissing, object: nil)
+        }
         if !isCancellation && !isTransientNetwork && !isUserCorrectableSignIn {
             SentrySDK.capture(error: self) { scope in
                 scope.setTag(value: flow, key: "flow")
@@ -54,4 +57,10 @@ extension Error {
         }
         return localizedDescription
     }
+}
+
+extension Notification.Name {
+    /// A request found no session in the keychain; RootView decides whether
+    /// that means signed out.
+    static let sessionMissing = Notification.Name("HowdaySessionMissing")
 }
