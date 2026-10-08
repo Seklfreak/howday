@@ -21,6 +21,19 @@ extension Error {
         localizedDescription.localizedCaseInsensitiveContains("issued at future")
     }
 
+    /// supabase-swift (2.55.3+) drops a token refresh whose starting session
+    /// was replaced in the keychain while the request was in flight — meant
+    /// for a sign-out racing a refresh, but the widget shares that keychain
+    /// item and refreshes on its own. When both find an expired token at
+    /// once and the widget stores its result first, the app's refresh throws
+    /// this although the session stored now is fresh and valid
+    /// (MOODRING-IOS-9). Transient: a second attempt reads that session.
+    /// Matched by text because the notification extension links no
+    /// Supabase; `ErrorHelpersTests` pins it to the SDK's error.
+    var isRefreshDiscarded: Bool {
+        localizedDescription.hasPrefix("Token refresh discarded")
+    }
+
     /// The device couldn't reach the network — backgrounded mid-request, no
     /// signal, DNS or the connection dropped. Worth showing the user (the load
     /// really did fail) but never worth a Sentry issue: there is no defect to
@@ -44,9 +57,21 @@ extension Error {
     }
 }
 
-/// Runs `operation`, retrying once after a short pause if it fails with the
-/// transient PostgREST clock-skew error (see `isJWTClockSkew`).
+/// Runs `operation`, retrying once if it fails with the transient PostgREST
+/// clock-skew error (after a short pause; see `isJWTClockSkew`) or with a
+/// token refresh another process beat it to (at once; see
+/// `isRefreshDiscarded`). The retry after a discarded refresh may itself
+/// meet clock skew — it runs on the token the widget just minted — so it
+/// gets the skew retry as well, but never a second discarded-refresh one.
 func withSkewRetry<T>(_ operation: () async throws -> T) async throws -> T {
+    do {
+        return try await retryingClockSkew(operation)
+    } catch where error.isRefreshDiscarded {
+        return try await retryingClockSkew(operation)
+    }
+}
+
+private func retryingClockSkew<T>(_ operation: () async throws -> T) async throws -> T {
     do {
         return try await operation()
     } catch where error.isJWTClockSkew {

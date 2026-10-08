@@ -62,4 +62,36 @@ struct ErrorHelpersTests {
         _ = authError(.otpExpired).report("test")
         #expect(heard == 1)
     }
+
+    /// MOODRING-IOS-9: matched by text in `Shared`, so this is what notices
+    /// an SDK release rewording it.
+    @Test func aDiscardedRefreshIsRecognised() {
+        #expect(AuthError.refreshDiscarded.isRefreshDiscarded)
+        #expect(!AuthError.sessionMissing.isRefreshDiscarded)
+        #expect(!URLError(.timedOut).isRefreshDiscarded)
+    }
+
+    /// The widget beat the app to the refresh; the second attempt reads the
+    /// session it stored.
+    @Test func aDiscardedRefreshIsRetriedOnce() async throws {
+        var calls = 0
+        let value = try await withSkewRetry {
+            calls += 1
+            if calls == 1 { throw AuthError.refreshDiscarded }
+            return 42
+        }
+        #expect(value == 42)
+        #expect(calls == 2)
+    }
+
+    @Test func aRefreshDiscardedTwiceIsNotRetriedAgain() async {
+        var calls = 0
+        await #expect(throws: AuthError.self) {
+            try await withSkewRetry {
+                calls += 1
+                throw AuthError.refreshDiscarded
+            }
+        }
+        #expect(calls == 2)
+    }
 }
