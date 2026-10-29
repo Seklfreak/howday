@@ -20,7 +20,7 @@ packages:
     # request crashed the app (getsentry/sentry-cocoa#9154). Renovate's
     # xcodegen manager reads exactVersion, so new releases now arrive as a
     # PR and a commit instead.
-    exactVersion: 9.31.0
+    exactVersion: 9.32.0
 configFiles:
   Debug: Config/Secrets.xcconfig
   Release: Config/Secrets.xcconfig
