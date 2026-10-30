@@ -10,7 +10,7 @@ packages:
     # Exact for the same reason as Sentry below: with `from:` 1.28.7 took
     # 2.55.3 unannounced, and its new refreshDiscarded error reached the
     # screen (MOODRING-IOS-9).
-    exactVersion: 2.55.5
+    exactVersion: 2.55.6
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     # Exact, not `from:`: Package.resolved isn't committed, so a floor let
